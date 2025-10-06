@@ -1,29 +1,57 @@
 import { useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { BarChart3 } from "lucide-react";
+import { Link, useSearchParams, Navigate } from "react-router-dom";
+import { BarChart3, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Auth() {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get("mode") || "login";
+  const { user, login, register, resetPassword } = useAuth();
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implementar autenticación con Lovable Cloud
-    console.log("Login:", { email, password });
+    setLoading(true);
+    try {
+      await login(email, password);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implementar registro con Lovable Cloud
-    console.log("Signup:", { name, email, password });
+    setLoading(true);
+    try {
+      await register(email, password, name);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await resetPassword(email);
+      setResetMode(false);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -52,38 +80,72 @@ export default function Auth() {
             </TabsList>
 
             <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Contraseña</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <a href="#" className="text-primary hover:underline">
-                    ¿Olvidaste tu contraseña?
-                  </a>
-                </div>
-                <Button type="submit" variant="hero" className="w-full" size="lg">
-                  Iniciar Sesión
-                </Button>
-              </form>
+              {resetMode ? (
+                <form onSubmit={handleResetPassword} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Enviar enlace de recuperación
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => setResetMode(false)}
+                  >
+                    Volver a iniciar sesión
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Contraseña</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <button
+                      type="button"
+                      onClick={() => setResetMode(true)}
+                      className="text-primary hover:underline"
+                    >
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  </div>
+                  <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Iniciar Sesión
+                  </Button>
+                </form>
+              )}
             </TabsContent>
 
             <TabsContent value="signup">
@@ -119,9 +181,12 @@ export default function Auth() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    minLength={6}
                   />
+                  <p className="text-xs text-muted-foreground">Mínimo 6 caracteres</p>
                 </div>
-                <Button type="submit" variant="hero" className="w-full" size="lg">
+                <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Crear Cuenta
                 </Button>
               </form>
