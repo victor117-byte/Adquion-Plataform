@@ -5,13 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDocuments } from "@/contexts/DocumentContext";
 import { FileUpload } from "@/components/FileUpload";
+import { DocumentList } from "@/components/DocumentList";
 import { UserManagement } from "@/components/UserManagement";
 import { PaymentForm } from "@/components/PaymentForm";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const { documents, pagination, fetchDocuments } = useDocuments();
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Simplemente cambiar la pestaña activa, DocumentList maneja su propia carga
+  const handleTabChange = (tab: string) => {
+    console.log(`Cambiando a la pestaña: ${tab}`);
+    setActiveTab(tab);
+    // Ya no cargamos documentos aquí, lo hace el componente DocumentList
+  };
 
   if (!user) {
     return <Navigate to="/auth" replace />;
@@ -19,7 +29,7 @@ export default function Dashboard() {
 
   const isAdmin = user.role === 'admin';
   return (
-    <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 border-r border-border bg-card p-6">
         <div className="flex items-center gap-2 mb-8">
@@ -31,7 +41,7 @@ export default function Dashboard() {
           <Button 
             variant={activeTab === "overview" ? "default" : "ghost"} 
             className="w-full justify-start" 
-            onClick={() => setActiveTab("overview")}
+            onClick={() => handleTabChange("overview")}
           >
             <BarChart3 className="mr-2 h-4 w-4" />
             Dashboard
@@ -39,16 +49,24 @@ export default function Dashboard() {
           <Button 
             variant={activeTab === "upload" ? "default" : "ghost"} 
             className="w-full justify-start"
-            onClick={() => setActiveTab("upload")}
+            onClick={() => handleTabChange("upload")}
           >
             <Upload className="mr-2 h-4 w-4" />
             Cargar Archivos
+          </Button>
+          <Button 
+            variant={activeTab === "documents" ? "default" : "ghost"} 
+            className="w-full justify-start"
+            onClick={() => handleTabChange("documents")}
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            Mis Documentos
           </Button>
           {isAdmin && (
             <Button 
               variant={activeTab === "users" ? "default" : "ghost"} 
               className="w-full justify-start"
-              onClick={() => setActiveTab("users")}
+              onClick={() => handleTabChange("users")}
             >
               <Users className="mr-2 h-4 w-4" />
               Gestión de Usuarios
@@ -57,7 +75,7 @@ export default function Dashboard() {
           <Button 
             variant={activeTab === "billing" ? "default" : "ghost"} 
             className="w-full justify-start"
-            onClick={() => setActiveTab("billing")}
+            onClick={() => handleTabChange("billing")}
           >
             <CreditCard className="mr-2 h-4 w-4" />
             Facturación
@@ -75,7 +93,13 @@ export default function Dashboard() {
       {/* Main Content */}
       <main className="ml-64 p-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+          <h1 className="text-3xl font-bold mb-2">
+            {activeTab === "overview" && "Dashboard"}
+            {activeTab === "upload" && "Cargar Archivos"}
+            {activeTab === "documents" && "Mis Documentos"}
+            {activeTab === "users" && "Gestión de Usuarios"}
+            {activeTab === "billing" && "Facturación"}
+          </h1>
           <p className="text-muted-foreground">
             Bienvenido, {user.name}
           </p>
@@ -169,6 +193,13 @@ export default function Dashboard() {
           </div>
         )}
 
+        {activeTab === "documents" && (
+          <div>
+            <h2 className="text-2xl font-bold mb-6">Mis Documentos</h2>
+            <DocumentList />
+          </div>
+        )}
+
         {activeTab === "billing" && (
           <div className="max-w-2xl">
             <h2 className="text-2xl font-bold mb-6">Suscripción y Facturación</h2>
@@ -199,6 +230,6 @@ export default function Dashboard() {
           </div>
         )}
       </main>
-    </div>
+      </div>
   );
 }

@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 
 interface User {
-  id: string;
+  id: number;
   email: string;
-  name: string;
   role: 'user' | 'admin' | 'accountant';
+  name?: string;
 }
 
 interface AuthContextType {
@@ -37,28 +37,75 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // CONFIGURACIÓN DEL BACKEND - Reemplaza con tu URL
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  // CONFIGURACIÓN DEL BACKEND
+  const API_URL = 'http://localhost:8000/api';
+  console.log('AuthContext - API URL:', API_URL);
 
   useEffect(() => {
     // Verificar si hay sesión guardada
-    const checkSession = () => {
+    const checkSession = async () => {
       const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
+      console.log('Verificando sesión, token:', token ? 'presente' : 'ausente');
       
-      if (token && userData) {
+      if (token) {
         try {
-          setUser(JSON.parse(userData));
+          console.log('Verificando token con la API...');
+          // Verificar el token con la API usando el formato correcto Bearer con espacio
+          const response = await fetch(`${API_URL}/users/me`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          console.log('Respuesta de verificación:', response.status);
+          
+          if (response.ok) {
+            const userData = await response.json();
+            console.log('Usuario verificado:', userData);
+            setUser(userData);
+            localStorage.setItem('user_data', JSON.stringify(userData));
+          } else {
+            console.log('Token no válido, eliminando datos');
+            // Si tenemos datos de usuario en localStorage, podemos usarlos temporalmente
+            const cachedUserData = localStorage.getItem('user_data');
+            if (cachedUserData) {
+              try {
+                const parsedUserData = JSON.parse(cachedUserData);
+                setUser(parsedUserData);
+                console.log('Usando datos de usuario en caché:', parsedUserData);
+              } catch (e) {
+                console.error('Error al parsear datos de usuario en caché');
+              }
+            }
+            
+            // Token no válido, eliminar datos
+            // localStorage.removeItem('auth_token');
+            // localStorage.removeItem('user_data');
+          }
         } catch (error) {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user_data');
+          console.error('Error al verificar sesión:', error);
+          // localStorage.removeItem('auth_token');
+          // localStorage.removeItem('user_data');
+          
+          // Si tenemos datos de usuario en localStorage, podemos usarlos temporalmente
+          const cachedUserData = localStorage.getItem('user_data');
+          if (cachedUserData) {
+            try {
+              const parsedUserData = JSON.parse(cachedUserData);
+              setUser(parsedUserData);
+              console.log('Usando datos de usuario en caché durante error:', parsedUserData);
+            } catch (e) {
+              console.error('Error al parsear datos de usuario en caché');
+            }
+          }
         }
       }
+      
       setLoading(false);
     };
 
     checkSession();
-  }, []);
+  }, [API_URL]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -72,13 +119,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Error al iniciar sesión');
+        throw new Error(error.detail || error.message || 'Error al iniciar sesión');
       }
 
       const data = await response.json();
       
+      console.log('Login exitoso, datos recibidos:', data);
+      
       // Guardar token y datos de usuario
-      localStorage.setItem('auth_token', data.token);
+      if (data.access_token) {
+        localStorage.setItem('auth_token', data.access_token);
+      } else if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      } else {
+        console.error('No se encontró un token en la respuesta', data);
+        throw new Error('No se recibió un token de autenticación válido');
+      }
+      
       localStorage.setItem('user_data', JSON.stringify(data.user));
       
       setUser(data.user);
@@ -101,23 +158,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const register = async (email: string, password: string, name: string) => {
     try {
+      // El endpoint de registro según las instrucciones espera: email, password y role
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          role: 'user' // Asignamos rol por defecto
+        }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Error al registrarse');
+        throw new Error(error.detail || error.message || 'Error al registrarse');
       }
 
       const data = await response.json();
       
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user_data', JSON.stringify(data.user));
+      // Si la API devuelve token en el registro, lo guardamos
+      if (data.access_token) {
+        localStorage.setItem('auth_token', data.access_token);
+        localStorage.setItem('user_data', JSON.stringify(data.user));
+      }
       
       setUser(data.user);
       
@@ -138,6 +203,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logout = async () => {
+    console.log('Cerrando sesión, eliminando token y datos de usuario');
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
     setUser(null);
