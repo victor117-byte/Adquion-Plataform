@@ -5,15 +5,16 @@ import { Card } from "./ui/card";
 
 const plans = [
   {
-    name: "Gratuito",
+    name: "Basic Free",
     price: "$0",
     period: "/mes",
-    description: "Ideal para empezar",
+    description: "Perfecto para comenzar",
     features: [
-      "10 documentos por mes",
-      "1 usuario",
-      "Soporte por email",
-      "Almacenamiento básico",
+      "Límite de 50 archivos",
+      "1 Ejecución de automatización (SAT)",
+      "Acceso solo a Dashboard",
+      "Acceso seguro",
+      "Archivos de aclaración del contador",
     ],
     cta: "Comenzar Gratis",
     highlighted: false,
@@ -24,29 +25,35 @@ const plans = [
     period: "/mes",
     description: "Para contadores profesionales",
     features: [
-      "500 documentos por mes",
-      "5 usuarios",
-      "Soporte prioritario",
-      "Almacenamiento ampliado",
-      "Integraciones API",
-      "Reportes avanzados",
+      "1 GB de almacenamiento",
+      "5 usuarios (Contadores)",
+      "Reportes de clientes",
+      "Dashboard completo",
+      "Auto-refresh (Automatización)",
+      "3 ejecuciones programadas por día",
+      "Notificaciones (WhatsApp / Email)",
+      "30 clientes",
+      "Integraciones (SAT)",
     ],
     cta: "Comenzar Prueba",
     highlighted: true,
   },
   {
-    name: "Empresarial",
-    price: "$199",
+    name: "Business",
+    price: "$99",
     period: "/mes",
-    description: "Para equipos grandes",
+    description: "Para equipos en crecimiento",
     features: [
-      "Documentos ilimitados",
-      "Usuarios ilimitados",
-      "Soporte 24/7",
-      "Almacenamiento ilimitado",
-      "Integraciones personalizadas",
-      "Gestor de cuenta dedicado",
-      "SLA garantizado",
+      "7 GB de almacenamiento",
+      "10 usuarios (Contadores)",
+      "Reportes de clientes",
+      "Dashboard con KPI Contadores",
+      "Auto-refresh (Automatización)",
+      "3 ejecuciones programadas por día",
+      "Notificaciones (WhatsApp / Email)",
+      "150 clientes",
+      "Integraciones (SAT)",
+      "Agente IA personalizado",
     ],
     cta: "Contactar Ventas",
     highlighted: false,
@@ -58,11 +65,15 @@ export const Pricing = () => {
     <section id="pricing" className="py-20 px-4 bg-muted/30">
       <div className="container mx-auto max-w-6xl">
         <div className="text-center mb-16">
+          <div className="inline-block mb-3">
+            <span className="text-sm font-semibold tracking-wider uppercase text-primary">Planes</span>
+          </div>
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            Planes que se adaptan a ti
+            Precios simples y transparentes
           </h2>
-          <p className="text-lg text-muted-foreground">
-            Elige el plan perfecto para tus necesidades
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Desde automatización básica hasta agentes IA personalizados. 
+            Elige el plan que mejor se adapte a tu negocio.
           </p>
         </div>
         

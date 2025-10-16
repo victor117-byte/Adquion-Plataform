@@ -9,11 +9,11 @@ export const Footer = () => {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <BarChart3 className="h-6 w-6 text-primary" />
-              <span className="font-bold text-xl">Acquisitions</span>
+              <span className="font-bold text-xl">Adquion</span>
             </div>
             <p className="text-sm text-muted-foreground max-w-md">
-              Plataforma SaaS para gestión fiscal inteligente diseñada para
-              contadores y contribuyentes.
+              Automatización fiscal con IA. Scraping SAT, notificaciones inteligentes 
+              y reportes en tiempo real para contadores profesionales.
             </p>
           </div>
           
@@ -62,7 +62,7 @@ export const Footer = () => {
         
         <div className="border-t border-border mt-8 pt-8 text-center">
           <p className="text-sm text-muted-foreground">
-            © 2025 Acquisitions. Todos los derechos reservados.
+            © 2025 Adquion. Todos los derechos reservados.
           </p>
         </div>
       </div>
