@@ -2,6 +2,13 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 
+const scrollToSection = (sectionId: string) => {
+  const element = document.getElementById(sectionId);
+  if (element) {
+    element.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+};
+
 export const Hero = () => {
   return (
     <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-background to-muted/30">
@@ -26,11 +33,13 @@ export const Hero = () => {
               <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
           </Link>
-          <Link to="/#pricing">
-            <Button variant="outline" size="lg">
-              Ver Planes
-            </Button>
-          </Link>
+          <Button 
+            variant="outline" 
+            size="lg"
+            onClick={() => scrollToSection('pricing')}
+          >
+            Ver Planes
+          </Button>
         </div>
       </div>
     </section>
