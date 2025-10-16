@@ -126,7 +126,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         description: "Tu cuenta ha sido creada exitosamente",
       });
       
-      navigate('/dashboard');
+      // Redirigir al onboarding para selección de plan
+      navigate('/onboarding');
     } catch (error) {
       toast({
         title: "Error",

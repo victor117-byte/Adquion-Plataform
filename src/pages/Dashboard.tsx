@@ -22,9 +22,13 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 border-r border-border bg-card p-6">
-        <div className="flex items-center gap-2 mb-8">
-          <BarChart3 className="h-6 w-6 text-primary" />
-          <span className="font-bold text-xl">Acquisitions</span>
+        <div className="flex items-center gap-3 mb-8">
+          <div className="p-2 bg-gradient-to-br from-primary to-purple-600 rounded-xl">
+            <BarChart3 className="h-5 w-5 text-white" />
+          </div>
+          <span className="font-bold text-xl bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+            Adquion
+          </span>
         </div>
         
         <nav className="space-y-2">

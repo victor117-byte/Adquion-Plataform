@@ -58,9 +58,13 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity">
-            <BarChart3 className="h-8 w-8 text-primary" />
-            <span className="font-bold text-2xl">Acquisitions</span>
+          <Link to="/" className="inline-flex items-center gap-3 mb-6 hover:opacity-80 transition-opacity group">
+            <div className="p-2 bg-gradient-to-br from-primary to-purple-600 rounded-xl group-hover:scale-110 transition-transform">
+              <BarChart3 className="h-6 w-6 text-white" />
+            </div>
+            <span className="font-bold text-2xl bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+              Adquion
+            </span>
           </Link>
           <h1 className="text-3xl font-bold mb-2">
             {mode === "signup" ? "Crear cuenta" : "Bienvenido de nuevo"}
