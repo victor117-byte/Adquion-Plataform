@@ -30,37 +30,74 @@ export const PaymentForm = ({ planName, amount, onSuccess }: PaymentFormProps) =
     try {
       const token = localStorage.getItem('auth_token');
       
-      // Crear intención de pago con Stripe
+      if (!token) {
+        throw new Error('No estás autenticado');
+      }
+
+      // Primero crear el Setup Intent para el método de pago
+      const setupResponse = await fetch(`${API_URL}/payments/create-setup-intent`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      });
+
+      if (!setupResponse.ok) {
+        const error = await setupResponse.json();
+        throw new Error(error.message || 'Error al configurar el pago');
+      }
+
+      const setupData = await setupResponse.json();
+      
+      // Aquí deberías integrar Stripe Elements para tokenizar la tarjeta
+      // Por ahora simulamos el payment_method_id
+      const paymentMethodId = 'pm_card_visa'; // Este vendría de Stripe.js
+
+      // Crear la suscripción
       const response = await fetch(`${API_URL}/payments/create-subscription`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
         body: JSON.stringify({
-          plan: planName,
-          paymentMethod: {
-            card: cardData,
-          },
+          plan: planName.toLowerCase(),
+          payment_method_id: paymentMethodId,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Error al procesar el pago');
+        const error = await response.json();
+        throw new Error(error.message || 'Error al procesar el pago');
       }
 
       const data = await response.json();
 
       toast({
-        title: "¡Pago exitoso!",
-        description: `Te has suscrito al plan ${planName}`,
+        title: "¡Suscripción activada!",
+        description: `Ahora tienes acceso al plan ${planName}`,
       });
+
+      // Actualizar usuario en localStorage
+      const userData = localStorage.getItem('user_data');
+      if (userData) {
+        const user = JSON.parse(userData);
+        user.subscription = {
+          plan: planName.toLowerCase(),
+          status: data.status,
+          expires_at: data.current_period_end,
+        };
+        localStorage.setItem('user_data', JSON.stringify(user));
+      }
 
       onSuccess?.();
     } catch (error) {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error al procesar el pago",
+        title: "Error en el pago",
+        description: error instanceof Error ? error.message : "No se pudo procesar el pago",
         variant: "destructive",
       });
     } finally {

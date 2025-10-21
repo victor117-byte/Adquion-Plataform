@@ -37,23 +37,53 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // CONFIGURACIÓN DEL BACKEND - Reemplaza con tu URL
+  // CONFIGURACIÓN DEL BACKEND
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-  useEffect(() => {
-    // Verificar si hay sesión guardada
-    const checkSession = () => {
+  // Headers comunes para todas las peticiones (incluye bypass de ngrok)
+  const getHeaders = (includeAuth = false) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
+    
+    if (includeAuth) {
       const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+    
+    return headers;
+  };
+
+  useEffect(() => {
+    // Verificar sesión con el backend
+    const checkSession = async () => {
+      const token = localStorage.getItem('auth_token');
       
-      if (token && userData) {
+      if (token) {
         try {
-          setUser(JSON.parse(userData));
+          // Validar token con el backend
+          const response = await fetch(`${API_URL}/auth/me`, {
+            headers: getHeaders(true),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setUser(data.user);
+          } else {
+            // Token inválido o expirado
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user_data');
+          }
         } catch (error) {
+          console.error('Error validando sesión:', error);
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user_data');
         }
       }
+      
       setLoading(false);
     };
 
@@ -64,15 +94,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getHeaders(),
         body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Error al iniciar sesión');
+        throw new Error(error.message || 'Credenciales inválidas');
       }
 
       const data = await response.json();
@@ -85,13 +113,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       toast({
         title: "¡Bienvenido!",
-        description: "Has iniciado sesión exitosamente",
+        description: `Has iniciado sesión como ${data.user.name}`,
       });
       
-      navigate('/dashboard');
+      // Verificar si tiene suscripción activa
+      if (data.user.subscription?.status === 'active') {
+        navigate('/dashboard');
+      } else {
+        navigate('/onboarding');
+      }
     } catch (error) {
       toast({
-        title: "Error",
+        title: "Error de autenticación",
         description: error instanceof Error ? error.message : "Error al iniciar sesión",
         variant: "destructive",
       });
@@ -103,9 +136,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getHeaders(),
         body: JSON.stringify({ email, password, name }),
       });
 
@@ -122,16 +153,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setUser(data.user);
       
       toast({
-        title: "¡Cuenta creada!",
-        description: "Tu cuenta ha sido creada exitosamente",
+        title: "¡Cuenta creada exitosamente!",
+        description: `Bienvenido ${data.user.name}, ahora selecciona tu plan`,
       });
       
       // Redirigir al onboarding para selección de plan
       navigate('/onboarding');
     } catch (error) {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error al registrarse",
+        title: "Error de registro",
+        description: error instanceof Error ? error.message : "Error al crear la cuenta",
         variant: "destructive",
       });
       throw error;
@@ -153,9 +184,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const response = await fetch(`${API_URL}/auth/reset-password`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getHeaders(),
         body: JSON.stringify({ email }),
       });
 
