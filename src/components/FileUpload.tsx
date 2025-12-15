@@ -136,23 +136,6 @@ export const FileUpload = () => {
             )
           );
           
-          // Guardar archivo en localStorage para que aparezca en FileHistory
-          const uploadedDoc = {
-            id: fileItem.id,
-            filename: fileItem.file.name,
-            size: fileItem.file.size,
-            upload_date: new Date().toISOString(),
-            status: 'processed' as const,
-            download_url: '#',
-          };
-          
-          const saved = localStorage.getItem('uploadedDocs');
-          const uploadedDocs = saved ? JSON.parse(saved) : [];
-          uploadedDocs.unshift(uploadedDoc); // Agregar al inicio
-          localStorage.setItem('uploadedDocs', JSON.stringify(uploadedDocs));
-          console.log('✅ Archivo guardado en localStorage:', uploadedDoc);
-          console.log('📦 Total de archivos:', uploadedDocs.length);
-          
           toast({
             title: "✅ Archivo cargado",
             description: `${fileItem.file.name} se subió correctamente`,

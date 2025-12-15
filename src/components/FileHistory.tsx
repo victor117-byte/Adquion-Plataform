@@ -61,60 +61,25 @@ export const FileHistory = () => {
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
-  const [deletedDocIds, setDeletedDocIds] = useState<Set<string>>(() => {
-    const saved = localStorage.getItem('deletedDocIds');
-    return saved ? new Set(JSON.parse(saved)) : new Set();
-  });
-  const [uploadedDocs, setUploadedDocs] = useState<Document[]>(() => {
-    const saved = localStorage.getItem('uploadedDocs');
-    const docs = saved ? JSON.parse(saved) : [];
-    console.log('📂 FileHistory cargó archivos de localStorage:', docs.length);
-    return docs;
-  });
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
     fetchDocuments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, pagination.limit, statusFilter, sortBy]);
-
-  // Escuchar cambios en localStorage para actualizar cuando se suban archivos
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const saved = localStorage.getItem('uploadedDocs');
-      const newUploadedDocs = saved ? JSON.parse(saved) : [];
-      setUploadedDocs(newUploadedDocs);
-      fetchDocuments(); // Recargar lista completa
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Polling ligero para cambios en la misma pestaña
-    const interval = setInterval(() => {
-      const saved = localStorage.getItem('uploadedDocs');
-      const newUploadedDocs = saved ? JSON.parse(saved) : [];
-      if (JSON.stringify(newUploadedDocs) !== JSON.stringify(uploadedDocs)) {
-        setUploadedDocs(newUploadedDocs);
-        fetchDocuments();
-      }
-    }, 1000);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(interval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadedDocs]);
+  }, [pagination.page, pagination.limit, statusFilter, sortBy, searchTerm]);
 
   const fetchDocuments = async () => {
     setLoading(true);
     const token = localStorage.getItem('token');
 
-    // Si no hay token, ir directo a modo demo
     if (!token) {
-      console.log('Sin token, activando modo demo');
-      loadMockData();
+      toast({
+        title: "⚠️ No autenticado",
+        description: "Por favor inicia sesión para ver tus documentos",
+        variant: "destructive",
+      });
+      setDocuments([]);
       setLoading(false);
       return;
     }
@@ -128,131 +93,59 @@ export const FileHistory = () => {
         ...(searchTerm && { search: searchTerm }),
       });
 
-      // Timeout para el fetch
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
       const response = await fetch(`${API_URL}/documents?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
-        signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
         
-        // Verificar que la respuesta tenga la estructura esperada
         if (data && Array.isArray(data.documents)) {
           setDocuments(data.documents);
           setPagination({
-            page: data.page || 1,
-            limit: data.limit || 10,
-            total: data.total || 0,
-            totalPages: data.total_pages || 0,
+            page: data.pagination?.page || pagination.page,
+            limit: data.pagination?.limit || pagination.limit,
+            total: data.pagination?.total || 0,
+            totalPages: data.pagination?.total_pages || 0,
           });
         } else {
-          // Si la estructura no es la esperada, usar modo demo
-          console.log('Estructura de respuesta inesperada, activando modo demo');
-          loadMockData();
+          console.error('Estructura de respuesta inesperada:', data);
+          toast({
+            title: "❌ Error",
+            description: "Formato de respuesta del servidor inválido",
+            variant: "destructive",
+          });
+          setDocuments([]);
         }
+      } else if (response.status === 401) {
+        toast({
+          title: "⚠️ Sesión expirada",
+          description: "Por favor inicia sesión nuevamente",
+          variant: "destructive",
+        });
+        setDocuments([]);
       } else {
-        // Cualquier otro código de estado, activar modo demo
-        console.log(`Respuesta ${response.status}, activando modo demo`);
-        loadMockData();
+        const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+        toast({
+          title: "❌ Error del servidor",
+          description: error.message || `Error ${response.status}`,
+          variant: "destructive",
+        });
+        setDocuments([]);
       }
     } catch (error) {
-      // Modo demo cuando hay error
-      console.log('Error al cargar documentos, activando modo demo:', error);
-      loadMockData();
+      console.error('Error al cargar documentos:', error);
+      toast({
+        title: "❌ Error de conexión",
+        description: "No se pudo conectar con el servidor",
+        variant: "destructive",
+      });
+      setDocuments([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadMockData = () => {
-    // Datos de demostración
-    const mockDocs: Document[] = [
-      {
-        id: '1',
-        filename: 'factura_001_2024.pdf',
-        size: 1245678,
-        upload_date: '2024-01-15T10:30:00Z',
-        status: 'processed',
-        download_url: '#',
-      },
-      {
-        id: '2',
-        filename: 'comprobante_pago_diciembre.pdf',
-        size: 856234,
-        upload_date: '2024-01-14T15:45:00Z',
-        status: 'processed',
-        download_url: '#',
-      },
-      {
-        id: '3',
-        filename: 'declaracion_anual_2023.pdf',
-        size: 3456789,
-        upload_date: '2024-01-13T09:20:00Z',
-        status: 'processing',
-      },
-      {
-        id: '4',
-        filename: 'cfdi_enero_2024.pdf',
-        size: 678901,
-        upload_date: '2024-01-12T14:10:00Z',
-        status: 'processed',
-        download_url: '#',
-      },
-      {
-        id: '5',
-        filename: 'recibo_honorarios.pdf',
-        size: 445566,
-        upload_date: '2024-01-11T11:00:00Z',
-        status: 'error',
-      },
-    ];
-
-    // Combinar documentos subidos con datos mock
-    const allDocs = [...uploadedDocs, ...mockDocs];
-    
-    // Filtrar documentos eliminados primero
-    let filtered = allDocs.filter(doc => !deletedDocIds.has(doc.id));
-
-    // Aplicar filtros locales
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(doc => doc.status === statusFilter);
-    }
-
-    if (searchTerm) {
-      filtered = filtered.filter(doc =>
-        doc.filename.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    // Aplicar ordenamiento
-    filtered.sort((a, b) => {
-      if (sortBy === 'date') {
-        return new Date(b.upload_date).getTime() - new Date(a.upload_date).getTime();
-      } else if (sortBy === 'name') {
-        return a.filename.localeCompare(b.filename);
-      } else {
-        return b.size - a.size;
-      }
-    });
-
-    // Simular paginación
-    const start = (pagination.page - 1) * pagination.limit;
-    const paginatedDocs = filtered.slice(start, start + pagination.limit);
-
-    setDocuments(paginatedDocs);
-    setPagination(prev => ({
-      ...prev,
-      total: filtered.length,
-      totalPages: Math.ceil(filtered.length / prev.limit),
-    }));
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -318,6 +211,16 @@ export const FileHistory = () => {
 
     try {
       const token = localStorage.getItem('token');
+      
+      if (!token) {
+        toast({
+          title: "⚠️ No autenticado",
+          description: "Por favor inicia sesión para eliminar documentos",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const response = await fetch(`${API_URL}/documents/${documentToDelete}`, {
         method: 'DELETE',
         headers: {
@@ -330,32 +233,28 @@ export const FileHistory = () => {
           title: "✅ Archivo eliminado",
           description: "El documento se eliminó correctamente",
         });
-        // Agregar a eliminados y recargar
-        setDeletedDocIds(prev => new Set(prev).add(documentToDelete));
         fetchDocuments();
-      } else {
+      } else if (response.status === 401) {
         toast({
-          title: "✅ Archivo eliminado (Demo)",
-          description: "Eliminación simulada. Endpoint pendiente.",
+          title: "⚠️ Sesión expirada",
+          description: "Por favor inicia sesión nuevamente",
+          variant: "destructive",
         });
-        // Agregar a la lista de eliminados en modo demo
-        const newDeletedIds = new Set(deletedDocIds).add(documentToDelete);
-        setDeletedDocIds(newDeletedIds);
-        localStorage.setItem('deletedDocIds', JSON.stringify([...newDeletedIds]));
-        // Recargar para aplicar filtro
-        fetchDocuments();
+      } else {
+        const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+        toast({
+          title: "❌ Error al eliminar",
+          description: error.message || `Error ${response.status}`,
+          variant: "destructive",
+        });
       }
     } catch (error) {
+      console.error('Error al eliminar documento:', error);
       toast({
-        title: "✅ Archivo eliminado (Demo)",
-        description: "Eliminación simulada. Endpoint pendiente.",
+        title: "❌ Error de conexión",
+        description: "No se pudo conectar con el servidor",
+        variant: "destructive",
       });
-      // Agregar a la lista de eliminados en modo demo
-      const newDeletedIds = new Set(deletedDocIds).add(documentToDelete);
-      setDeletedDocIds(newDeletedIds);
-      localStorage.setItem('deletedDocIds', JSON.stringify([...newDeletedIds]));
-      // Recargar para aplicar filtro
-      fetchDocuments();
     } finally {
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
