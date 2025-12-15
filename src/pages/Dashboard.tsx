@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { BarChart3, FileText, Users, Upload, LogOut } from "lucide-react";
+import { BarChart3, FileText, Users, Upload, LogOut, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileUpload } from "@/components/FileUpload";
+import { FileHistory } from "@/components/FileHistory";
 import { UserManagement } from "@/components/UserManagement";
 import { TrialBanner } from "@/components/TrialBanner";
 
@@ -46,6 +47,14 @@ export default function Dashboard() {
           >
             <Upload className="mr-2 h-4 w-4" />
             Cargar Archivos
+          </Button>
+          <Button 
+            variant={activeTab === "files" ? "default" : "ghost"} 
+            className="w-full justify-start"
+            onClick={() => setActiveTab("files")}
+          >
+            <FolderOpen className="mr-2 h-4 w-4" />
+            Archivos
           </Button>
           {isAdmin && (
             <Button 
@@ -157,6 +166,13 @@ export default function Dashboard() {
           <div className="max-w-4xl">
             <h2 className="text-2xl font-bold mb-6">Cargar Documentos</h2>
             <FileUpload />
+          </div>
+        )}
+
+        {activeTab === "files" && (
+          <div>
+            <h2 className="text-2xl font-bold mb-6">Historial de Archivos</h2>
+            <FileHistory />
           </div>
         )}
 
