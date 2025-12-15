@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, FileText, Download, Trash2, Calendar, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, FileText, Download, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -66,11 +66,20 @@ export const FileHistory = () => {
 
   useEffect(() => {
     fetchDocuments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, pagination.limit, statusFilter, sortBy]);
 
   const fetchDocuments = async () => {
     setLoading(true);
     const token = localStorage.getItem('token');
+
+    // Si no hay token, ir directo a modo demo
+    if (!token) {
+      console.log('Sin token, activando modo demo');
+      loadMockData();
+      setLoading(false);
+      return;
+    }
 
     try {
       const params = new URLSearchParams({
@@ -81,29 +90,44 @@ export const FileHistory = () => {
         ...(searchTerm && { search: searchTerm }),
       });
 
+      // Timeout para el fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
       const response = await fetch(`${API_URL}/documents?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
-        setDocuments(data.documents || []);
-        setPagination({
-          page: data.page || 1,
-          limit: data.limit || 10,
-          total: data.total || 0,
-          totalPages: data.total_pages || 0,
-        });
-      } else if (response.status === 404 || response.status === 0) {
-        // Modo demo con datos ficticios
-        loadMockData();
+        
+        // Verificar que la respuesta tenga la estructura esperada
+        if (data && Array.isArray(data.documents)) {
+          setDocuments(data.documents);
+          setPagination({
+            page: data.page || 1,
+            limit: data.limit || 10,
+            total: data.total || 0,
+            totalPages: data.total_pages || 0,
+          });
+        } else {
+          // Si la estructura no es la esperada, usar modo demo
+          console.log('Estructura de respuesta inesperada, activando modo demo');
+          loadMockData();
+        }
       } else {
-        throw new Error('Error al cargar documentos');
+        // Cualquier otro código de estado, activar modo demo
+        console.log(`Respuesta ${response.status}, activando modo demo`);
+        loadMockData();
       }
     } catch (error) {
       // Modo demo cuando hay error
+      console.log('Error al cargar documentos, activando modo demo:', error);
       loadMockData();
     } finally {
       setLoading(false);
@@ -373,17 +397,32 @@ export const FileHistory = () => {
             <h3 className="text-lg font-semibold">
               Documentos ({pagination.total})
             </h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchDocuments}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Actualizar
+            </Button>
           </div>
 
           {loading ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Cargando documentos...
+            <div className="text-center py-12">
+              <Loader2 className="mx-auto h-12 w-12 text-primary animate-spin mb-4" />
+              <p className="text-muted-foreground">Cargando documentos...</p>
             </div>
           ) : documents.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground mb-2">
                 No se encontraron documentos
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'Intenta ajustar los filtros de búsqueda'
+                  : 'Sube tu primer archivo en la pestaña "Cargar Archivos"'}
               </p>
             </div>
           ) : (
