@@ -61,6 +61,7 @@ export const FileHistory = () => {
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
+  const [deletedDocIds, setDeletedDocIds] = useState<Set<string>>(new Set());
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -177,9 +178,10 @@ export const FileHistory = () => {
       },
     ];
 
-    // Aplicar filtros locales
-    let filtered = mockDocs;
+    // Filtrar documentos eliminados primero
+    let filtered = mockDocs.filter(doc => !deletedDocIds.has(doc.id));
 
+    // Aplicar filtros locales
     if (statusFilter !== 'all') {
       filtered = filtered.filter(doc => doc.status === statusFilter);
     }
@@ -288,21 +290,28 @@ export const FileHistory = () => {
           title: "✅ Archivo eliminado",
           description: "El documento se eliminó correctamente",
         });
+        // Agregar a eliminados y recargar
+        setDeletedDocIds(prev => new Set(prev).add(documentToDelete));
         fetchDocuments();
       } else {
         toast({
-          title: "Modo Demo",
+          title: "✅ Archivo eliminado (Demo)",
           description: "Eliminación simulada. Endpoint pendiente.",
         });
-        // Eliminar localmente en modo demo
-        setDocuments(prev => prev.filter(doc => doc.id !== documentToDelete));
+        // Agregar a la lista de eliminados en modo demo
+        setDeletedDocIds(prev => new Set(prev).add(documentToDelete));
+        // Recargar para aplicar filtro
+        fetchDocuments();
       }
     } catch (error) {
       toast({
-        title: "Modo Demo",
+        title: "✅ Archivo eliminado (Demo)",
         description: "Eliminación simulada. Endpoint pendiente.",
       });
-      setDocuments(prev => prev.filter(doc => doc.id !== documentToDelete));
+      // Agregar a la lista de eliminados en modo demo
+      setDeletedDocIds(prev => new Set(prev).add(documentToDelete));
+      // Recargar para aplicar filtro
+      fetchDocuments();
     } finally {
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
