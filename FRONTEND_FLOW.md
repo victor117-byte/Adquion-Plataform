@@ -239,8 +239,8 @@ async function loginUsuario(email, password) {
 **Endpoint:** `POST /api/payments/create-subscription`
 
 ```javascript
-// Frontend: Modal de upgrade
-async function upgradePlan(plan, paymentMethodId) {
+// Frontend: Modal de upgrade con datos fiscales
+async function upgradePlan(plan, paymentMethodId, fiscalData) {
   const token = localStorage.getItem('token');
   
   const response = await fetch('http://localhost:8000/api/payments/create-subscription', {
@@ -250,8 +250,18 @@ async function upgradePlan(plan, paymentMethodId) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      plan: plan,  // 'pro', 'premium', 'business', 'enterprise'
-      payment_method_id: paymentMethodId  // De Stripe Elements
+      plan: plan,  // 'basic', 'pro', 'premium', 'business', 'enterprise'
+      payment_method_id: paymentMethodId,  // De Stripe Elements
+      fiscal_data: {  // ⭐ NUEVO: Datos fiscales opcionales
+        rfc: fiscalData.rfc,
+        razon_social: fiscalData.razonSocial,
+        regimen_fiscal: fiscalData.regimenFiscal,  // "601", "612", etc.
+        uso_cfdi: fiscalData.usoCfdi,  // "G03", "P01", etc.
+        codigo_postal: fiscalData.codigoPostal,
+        direccion: fiscalData.direccion,
+        ciudad: fiscalData.ciudad,
+        estado: fiscalData.estado
+      }
     })
   });
   
@@ -263,6 +273,20 @@ async function upgradePlan(plan, paymentMethodId) {
     mostrarMensaje('¡Suscripción activada!');
   }
 }
+
+// Ejemplo de uso con formulario completo
+const formData = {
+  rfc: 'SEB180915HG3',
+  razonSocial: 'Mi Empresa SA de CV',
+  regimenFiscal: '601',  // General de Ley Personas Morales
+  usoCfdi: 'G03',  // Gastos en general
+  codigoPostal: '37000',
+  direccion: 'Av Principal 123',
+  ciudad: 'León',
+  estado: 'GTO'
+};
+
+await upgradePlan('pro', 'pm_card_visa', formData);
 ```
 
 ---
