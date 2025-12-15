@@ -61,7 +61,16 @@ export const FileHistory = () => {
   });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
-  const [deletedDocIds, setDeletedDocIds] = useState<Set<string>>(new Set());
+  const [deletedDocIds, setDeletedDocIds] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('deletedDocIds');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
+  const [uploadedDocs, setUploadedDocs] = useState<Document[]>(() => {
+    const saved = localStorage.getItem('uploadedDocs');
+    const docs = saved ? JSON.parse(saved) : [];
+    console.log('📂 FileHistory cargó archivos de localStorage:', docs.length);
+    return docs;
+  });
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -69,6 +78,34 @@ export const FileHistory = () => {
     fetchDocuments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, pagination.limit, statusFilter, sortBy]);
+
+  // Escuchar cambios en localStorage para actualizar cuando se suban archivos
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const saved = localStorage.getItem('uploadedDocs');
+      const newUploadedDocs = saved ? JSON.parse(saved) : [];
+      setUploadedDocs(newUploadedDocs);
+      fetchDocuments(); // Recargar lista completa
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Polling ligero para cambios en la misma pestaña
+    const interval = setInterval(() => {
+      const saved = localStorage.getItem('uploadedDocs');
+      const newUploadedDocs = saved ? JSON.parse(saved) : [];
+      if (JSON.stringify(newUploadedDocs) !== JSON.stringify(uploadedDocs)) {
+        setUploadedDocs(newUploadedDocs);
+        fetchDocuments();
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadedDocs]);
 
   const fetchDocuments = async () => {
     setLoading(true);
@@ -178,8 +215,11 @@ export const FileHistory = () => {
       },
     ];
 
+    // Combinar documentos subidos con datos mock
+    const allDocs = [...uploadedDocs, ...mockDocs];
+    
     // Filtrar documentos eliminados primero
-    let filtered = mockDocs.filter(doc => !deletedDocIds.has(doc.id));
+    let filtered = allDocs.filter(doc => !deletedDocIds.has(doc.id));
 
     // Aplicar filtros locales
     if (statusFilter !== 'all') {
@@ -299,7 +339,9 @@ export const FileHistory = () => {
           description: "Eliminación simulada. Endpoint pendiente.",
         });
         // Agregar a la lista de eliminados en modo demo
-        setDeletedDocIds(prev => new Set(prev).add(documentToDelete));
+        const newDeletedIds = new Set(deletedDocIds).add(documentToDelete);
+        setDeletedDocIds(newDeletedIds);
+        localStorage.setItem('deletedDocIds', JSON.stringify([...newDeletedIds]));
         // Recargar para aplicar filtro
         fetchDocuments();
       }
@@ -309,7 +351,9 @@ export const FileHistory = () => {
         description: "Eliminación simulada. Endpoint pendiente.",
       });
       // Agregar a la lista de eliminados en modo demo
-      setDeletedDocIds(prev => new Set(prev).add(documentToDelete));
+      const newDeletedIds = new Set(deletedDocIds).add(documentToDelete);
+      setDeletedDocIds(newDeletedIds);
+      localStorage.setItem('deletedDocIds', JSON.stringify([...newDeletedIds]));
       // Recargar para aplicar filtro
       fetchDocuments();
     } finally {

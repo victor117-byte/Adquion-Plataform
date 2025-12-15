@@ -133,6 +133,24 @@ export const FileUpload = () => {
               f.id === fileItem.id ? { ...f, status: 'success' as const, progress: 100 } : f
             )
           );
+          
+          // Guardar archivo en localStorage para que aparezca en FileHistory
+          const uploadedDoc = {
+            id: fileItem.id,
+            filename: fileItem.file.name,
+            size: fileItem.file.size,
+            upload_date: new Date().toISOString(),
+            status: 'processed' as const,
+            download_url: '#',
+          };
+          
+          const saved = localStorage.getItem('uploadedDocs');
+          const uploadedDocs = saved ? JSON.parse(saved) : [];
+          uploadedDocs.unshift(uploadedDoc); // Agregar al inicio
+          localStorage.setItem('uploadedDocs', JSON.stringify(uploadedDocs));
+          console.log('✅ Archivo guardado en localStorage:', uploadedDoc);
+          console.log('📦 Total de archivos:', uploadedDocs.length);
+          
           toast({
             title: "✅ Archivo cargado",
             description: `${fileItem.file.name} se subió correctamente`,
@@ -181,6 +199,8 @@ export const FileUpload = () => {
 
   const simulateUpload = (fileId: string, fileName: string) => {
     let progress = 0;
+    const fileItem = files.find(f => f.id === fileId);
+    
     const interval = setInterval(() => {
       progress += 10;
       setFiles(prev =>
@@ -194,6 +214,26 @@ export const FileUpload = () => {
             f.id === fileId ? { ...f, status: 'success' as const, progress: 100 } : f
           )
         );
+        
+        // Guardar archivo en localStorage para que aparezca en FileHistory
+        if (fileItem) {
+          const uploadedDoc = {
+            id: fileId,
+            filename: fileName,
+            size: fileItem.file.size,
+            upload_date: new Date().toISOString(),
+            status: 'processed' as const,
+            download_url: '#',
+          };
+          
+          const saved = localStorage.getItem('uploadedDocs');
+          const uploadedDocs = saved ? JSON.parse(saved) : [];
+          uploadedDocs.unshift(uploadedDoc); // Agregar al inicio
+          localStorage.setItem('uploadedDocs', JSON.stringify(uploadedDocs));
+          console.log('✅ Archivo guardado en localStorage (modo demo):', uploadedDoc);
+          console.log('📦 Total de archivos:', uploadedDocs.length);
+        }
+        
         toast({
           title: "✅ Modo Demo",
           description: `${fileName} validado. Endpoint pendiente.`,
