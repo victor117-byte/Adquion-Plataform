@@ -156,35 +156,50 @@ export const FileUpload = () => {
             description: `${fileItem.file.name} se subió correctamente`,
           });
         } else {
-          // Cualquier otro código de estado, activar modo demo
-          console.log(`Respuesta ${xhr.status}, activando modo demo`);
-          simulateUpload(fileItem.id, fileItem.file.name);
+          // Error del servidor
+          setFiles(prev =>
+            prev.map(f =>
+              f.id === fileItem.id ? { ...f, status: 'error' as const } : f
+            )
+          );
+          toast({
+            title: "❌ Error al subir archivo",
+            description: `Error del servidor: ${xhr.status}`,
+            variant: "destructive",
+          });
         }
       });
 
       // Error de red
       xhr.addEventListener('error', () => {
         completed = true;
-        console.log('Error de red, activando modo demo');
-        simulateUpload(fileItem.id, fileItem.file.name);
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === fileItem.id ? { ...f, status: 'error' as const } : f
+          )
+        );
+        toast({
+          title: "❌ Error de conexión",
+          description: "No se pudo conectar con el servidor. Verifica que el backend esté corriendo.",
+          variant: "destructive",
+        });
       });
 
-      // Timeout reducido para modo demo más rápido
-      xhr.timeout = 5000; // 5 segundos
+      // Timeout de 30 segundos para archivos grandes
+      xhr.timeout = 30000;
       xhr.addEventListener('timeout', () => {
         completed = true;
-        console.log('Timeout, activando modo demo');
-        simulateUpload(fileItem.id, fileItem.file.name);
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === fileItem.id ? { ...f, status: 'error' as const } : f
+          )
+        );
+        toast({
+          title: "⏱️ Tiempo de espera agotado",
+          description: "El servidor tardó demasiado en responder",
+          variant: "destructive",
+        });
       });
-
-      // Timeout adicional de seguridad
-      setTimeout(() => {
-        if (!completed) {
-          console.log('Timeout de seguridad, activando modo demo');
-          xhr.abort();
-          simulateUpload(fileItem.id, fileItem.file.name);
-        }
-      }, 6000); // 6 segundos como respaldo
 
       xhr.open('POST', `${API_URL}/documents/upload`);
       if (token) {
@@ -192,54 +207,18 @@ export const FileUpload = () => {
       }
       xhr.send(formData);
     } catch (error) {
-      console.log('Error en catch, activando modo demo:', error);
-      simulateUpload(fileItem.id, fileItem.file.name);
-    }
-  };
-
-  const simulateUpload = (fileId: string, fileName: string) => {
-    let progress = 0;
-    const fileItem = files.find(f => f.id === fileId);
-    
-    const interval = setInterval(() => {
-      progress += 10;
+      console.error('Error al subir archivo:', error);
       setFiles(prev =>
-        prev.map(f => (f.id === fileId ? { ...f, progress } : f))
+        prev.map(f =>
+          f.id === fileItem.id ? { ...f, status: 'error' as const } : f
+        )
       );
-
-      if (progress >= 100) {
-        clearInterval(interval);
-        setFiles(prev =>
-          prev.map(f =>
-            f.id === fileId ? { ...f, status: 'success' as const, progress: 100 } : f
-          )
-        );
-        
-        // Guardar archivo en localStorage para que aparezca en FileHistory
-        if (fileItem) {
-          const uploadedDoc = {
-            id: fileId,
-            filename: fileName,
-            size: fileItem.file.size,
-            upload_date: new Date().toISOString(),
-            status: 'processed' as const,
-            download_url: '#',
-          };
-          
-          const saved = localStorage.getItem('uploadedDocs');
-          const uploadedDocs = saved ? JSON.parse(saved) : [];
-          uploadedDocs.unshift(uploadedDoc); // Agregar al inicio
-          localStorage.setItem('uploadedDocs', JSON.stringify(uploadedDocs));
-          console.log('✅ Archivo guardado en localStorage (modo demo):', uploadedDoc);
-          console.log('📦 Total de archivos:', uploadedDocs.length);
-        }
-        
-        toast({
-          title: "✅ Modo Demo",
-          description: `${fileName} validado. Endpoint pendiente.`,
-        });
-      }
-    }, 200);
+      toast({
+        title: "❌ Error inesperado",
+        description: error instanceof Error ? error.message : "Error desconocido",
+        variant: "destructive",
+      });
+    }
   };
 
   const removeFile = (fileId: string) => {
