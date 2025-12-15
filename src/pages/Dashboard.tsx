@@ -1,13 +1,12 @@
 import { useState } from "react";
-import { Link, Navigate } from "react-router-dom";
-import { BarChart3, FileText, Users, Upload, Settings, LogOut, CreditCard } from "lucide-react";
+import { Navigate } from "react-router-dom";
+import { BarChart3, FileText, Users, Upload, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { FileUpload } from "@/components/FileUpload";
 import { UserManagement } from "@/components/UserManagement";
-import { PaymentForm } from "@/components/PaymentForm";
+import { TrialBanner } from "@/components/TrialBanner";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -58,14 +57,6 @@ export default function Dashboard() {
               Gestión de Usuarios
             </Button>
           )}
-          <Button 
-            variant={activeTab === "billing" ? "default" : "ghost"} 
-            className="w-full justify-start"
-            onClick={() => setActiveTab("billing")}
-          >
-            <CreditCard className="mr-2 h-4 w-4" />
-            Facturación
-          </Button>
         </nav>
         
         <div className="absolute bottom-6 left-6 right-6 space-y-2">
@@ -81,9 +72,12 @@ export default function Dashboard() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">
-            Bienvenido, {user.name}
+            Bienvenido, {user.full_name}
           </p>
         </div>
+
+        {/* Trial Banner */}
+        <TrialBanner />
 
         {activeTab === "overview" && (
           <>
@@ -170,36 +164,6 @@ export default function Dashboard() {
           <div>
             <h2 className="text-2xl font-bold mb-6">Gestión de Usuarios</h2>
             <UserManagement />
-          </div>
-        )}
-
-        {activeTab === "billing" && (
-          <div className="max-w-2xl">
-            <h2 className="text-2xl font-bold mb-6">Suscripción y Facturación</h2>
-            <div className="space-y-6">
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Plan Actual: Gratuito</h3>
-                <p className="text-muted-foreground mb-4">
-                  Actualiza a un plan Pro o Empresarial para desbloquear más funciones
-                </p>
-                <Button variant="hero" asChild>
-                  <Link to="/#pricing">Ver Planes</Link>
-                </Button>
-              </Card>
-              
-              <div className="p-6 border border-dashed border-border rounded-lg text-center">
-                <p className="text-muted-foreground mb-4">
-                  ¿Quieres probar el plan Pro?
-                </p>
-                <PaymentForm 
-                  planName="Pro" 
-                  amount={29}
-                  onSuccess={() => {
-                    alert("¡Suscripción activada!");
-                  }}
-                />
-              </div>
-            </div>
           </div>
         )}
       </main>

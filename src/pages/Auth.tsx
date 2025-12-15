@@ -16,6 +16,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [company, setCompany] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
 
@@ -28,6 +29,8 @@ export default function Auth() {
     setLoading(true);
     try {
       await login(email, password);
+    } catch (error) {
+      console.error('Error en login:', error);
     } finally {
       setLoading(false);
     }
@@ -37,7 +40,9 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await register(email, password, name);
+      await register(email, password, name, company);
+    } catch (error) {
+      console.error('Error en registro:', error);
     } finally {
       setLoading(false);
     }
@@ -166,6 +171,17 @@ export default function Auth() {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="company">Empresa</Label>
+                  <Input
+                    id="company"
+                    type="text"
+                    placeholder="Mi Empresa SA"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input
                     id="signup-email"
@@ -191,7 +207,7 @@ export default function Auth() {
                 </div>
                 <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Crear Cuenta
+                  Crear Cuenta - Trial 30 días gratis
                 </Button>
               </form>
             </TabsContent>

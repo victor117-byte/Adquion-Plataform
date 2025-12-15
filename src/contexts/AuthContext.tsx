@@ -1,21 +1,20 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'user' | 'admin' | 'accountant';
-}
+import * as api from '@/lib/api';
+import type { User } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, company: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  verifyAndRestoreSession: () => Promise<void>;
+  refreshAuthToken: () => Promise<void>;
+  subscriptionStatus: api.SubscriptionStatus | null;
+  refreshSubscriptionStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,60 +34,97 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<api.SubscriptionStatus | null>(null);
   const navigate = useNavigate();
 
-  // CONFIGURACIÓN DEL BACKEND - Reemplaza con tu URL
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  // Verificar y restaurar sesión desde localStorage
+  const verifyAndRestoreSession = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Intentar obtener usuario del localStorage primero
+      const storedUser = api.getStoredUser();
+      if (storedUser) {
+        setUser(storedUser);
+      }
+
+      // Verificar sesión con el backend
+      if (api.isAuthenticated()) {
+        const userData = await api.verifySession();
+        setUser(userData);
+        api.saveAuthData(localStorage.getItem('token')!, userData);
+        
+        // Obtener estado de suscripción
+        await refreshSubscriptionStatus();
+      }
+    } catch (error) {
+      console.error('Error verificando sesión:', error);
+      // Si falla la verificación, limpiar datos
+      setUser(null);
+      localStorage.clear();
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Refrescar token de autenticación
+  const refreshAuthToken = useCallback(async () => {
+    if (!api.isAuthenticated()) return;
+
+    try {
+      const data = await api.refreshToken();
+      api.saveAuthData(data.token, data.user);
+      setUser(data.user);
+      console.log('✅ Token refrescado exitosamente');
+    } catch (error) {
+      console.error('Error refrescando token:', error);
+      // Si falla el refresh, cerrar sesión
+      await logout();
+    }
+  }, []);
+
+  // Refrescar estado de suscripción
+  const refreshSubscriptionStatus = useCallback(async () => {
+    if (!api.isAuthenticated()) return;
+
+    try {
+      const status = await api.getSubscriptionStatus();
+      setSubscriptionStatus(status);
+    } catch (error) {
+      console.error('Error obteniendo estado de suscripción:', error);
+    }
+  }, []);
 
   useEffect(() => {
-    // Verificar si hay sesión guardada
-    const checkSession = () => {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
-      
-      if (token && userData) {
-        try {
-          setUser(JSON.parse(userData));
-        } catch (error) {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user_data');
-        }
-      }
-      setLoading(false);
-    };
-
-    checkSession();
-  }, []);
+    verifyAndRestoreSession();
+  }, [verifyAndRestoreSession]);
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al iniciar sesión');
-      }
-
-      const data = await response.json();
+      const data = await api.login(email, password);
       
       // Guardar token y datos de usuario
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user_data', JSON.stringify(data.user));
-      
+      api.saveAuthData(data.token, data.user);
       setUser(data.user);
+      
+      // Obtener estado de suscripción
+      await refreshSubscriptionStatus();
       
       toast({
         title: "¡Bienvenido!",
-        description: "Has iniciado sesión exitosamente",
+        description: `Has iniciado sesión exitosamente${data.user.subscription.is_trial ? ` - ${data.user.subscription.days_remaining} días de trial restantes` : ''}`,
       });
       
-      navigate('/dashboard');
+      // Verificar si el trial expiró
+      if (!data.user.can_access_features) {
+        toast({
+          title: "Trial expirado",
+          description: "Tu período de prueba ha finalizado. Por favor, actualiza tu plan.",
+          variant: "destructive",
+        });
+        navigate('/onboarding');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -99,35 +135,24 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const register = async (email: string, password: string, name: string) => {
+  const register = async (email: string, password: string, fullName: string, company: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password, name }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al registrarse');
-      }
-
-      const data = await response.json();
+      const data = await api.register(email, password, fullName, company);
       
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user_data', JSON.stringify(data.user));
-      
+      // Guardar token y datos de usuario
+      api.saveAuthData(data.token, data.user);
       setUser(data.user);
+      
+      // Obtener estado de suscripción
+      await refreshSubscriptionStatus();
       
       toast({
         title: "¡Cuenta creada!",
-        description: "Tu cuenta ha sido creada exitosamente",
+        description: `Trial de ${data.user.subscription.days_remaining} días activado automáticamente`,
       });
       
-      // Redirigir al onboarding para selección de plan
-      navigate('/onboarding');
+      // Redirigir al dashboard (trial ya está activo)
+      navigate('/dashboard');
     } catch (error) {
       toast({
         title: "Error",
@@ -139,33 +164,30 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logout = async () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
+    try {
+      await api.logout();
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    }
+    
     setUser(null);
+    setSubscriptionStatus(null);
+    
     toast({
       title: "Sesión cerrada",
       description: "Has cerrado sesión exitosamente",
     });
+    
     navigate('/');
   };
 
   const resetPassword = async (email: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al enviar correo de recuperación');
-      }
-
+      // TODO: Implementar endpoint de reset password cuando esté disponible en el backend
       toast({
-        title: "Correo enviado",
-        description: "Revisa tu correo para restablecer tu contraseña",
+        title: "Funcionalidad no disponible",
+        description: "El reset de contraseña estará disponible próximamente",
+        variant: "destructive",
       });
     } catch (error) {
       toast({
@@ -178,7 +200,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, resetPassword }}>
+    <AuthContext.Provider 
+      value={{ 
+        user, 
+        loading, 
+        login, 
+        register, 
+        logout, 
+        resetPassword,
+        verifyAndRestoreSession,
+        refreshAuthToken,
+        subscriptionStatus,
+        refreshSubscriptionStatus,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
