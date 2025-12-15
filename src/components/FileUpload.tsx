@@ -110,6 +110,8 @@ export const FileUpload = () => {
     try {
       const formData = new FormData();
       formData.append('file', fileItem.file);
+      // El backend requiere el campo 'cliente'
+      formData.append('cliente', 'Web Upload');
 
       const xhr = new XMLHttpRequest();
       let completed = false;
