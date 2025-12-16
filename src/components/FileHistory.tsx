@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, FileText, Download, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, FileText, Download, Trash2, Calendar, Filter, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -101,8 +101,28 @@ export const FileHistory = () => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('📥 Respuesta del backend:', data);
         
-        if (data && Array.isArray(data.documents)) {
+        // El backend puede devolver array directo o objeto con documents
+        if (Array.isArray(data)) {
+          // Respuesta directa como array
+          console.log(`✅ ${data.length} documentos cargados`);
+          setDocuments(data);
+          setPagination(prev => ({
+            ...prev,
+            total: data.length,
+            totalPages: Math.ceil(data.length / prev.limit),
+          }));
+          
+          if (data.length === 0) {
+            toast({
+              title: "📂 Sin documentos",
+              description: "No hay archivos subidos aún. Sube tu primer documento.",
+            });
+          }
+        } else if (data && Array.isArray(data.documents)) {
+          // Respuesta con estructura completa
+          console.log(`✅ ${data.documents.length} documentos cargados`);
           setDocuments(data.documents);
           setPagination({
             page: data.pagination?.page || pagination.page,
@@ -110,14 +130,22 @@ export const FileHistory = () => {
             total: data.pagination?.total || 0,
             totalPages: data.pagination?.total_pages || 0,
           });
+          
+          if (data.documents.length === 0) {
+            toast({
+              title: "📂 Sin documentos",
+              description: "No hay archivos subidos aún. Sube tu primer documento.",
+            });
+          }
         } else {
-          console.error('Estructura de respuesta inesperada:', data);
-          toast({
-            title: "❌ Error",
-            description: "Formato de respuesta del servidor inválido",
-            variant: "destructive",
-          });
+          // Sin documentos
+          console.log('⚠️ Sin documentos');
           setDocuments([]);
+          setPagination(prev => ({
+            ...prev,
+            total: 0,
+            totalPages: 0,
+          }));
         }
       } else if (response.status === 401) {
         toast({
@@ -335,9 +363,21 @@ export const FileHistory = () => {
             </Select>
           </div>
 
-          <Button type="submit" className="w-full md:w-auto">
-            <Search className="mr-2 h-4 w-4" />
-            Buscar
+          <div className="flex gap-2">
+            <Button type="submit" className="w-full md:w-auto">
+              <Search className="mr-2 h-4 w-4" />
+              Buscar
+            </Button>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => fetchDocuments()}
+              className="w-full md:w-auto"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refrescar
+            </Button>
+          </div>
           </Button>
         </form>
       </Card>
