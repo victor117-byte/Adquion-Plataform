@@ -378,7 +378,6 @@ export const FileHistory = () => {
               Refrescar
             </Button>
           </div>
-          </Button>
         </form>
       </Card>
 
