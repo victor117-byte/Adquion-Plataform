@@ -85,6 +85,8 @@ export async function register(
  * Nota: La API espera 'username' en lugar de 'email' (OAuth2 standard)
  */
 export async function login(email: string, password: string): Promise<AuthResponse> {
+  console.log('🔐 Intentando login con:', { email, url: `${API_URL}/api/auth/login` });
+  
   const response = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -94,12 +96,17 @@ export async function login(email: string, password: string): Promise<AuthRespon
     }),
   });
 
+  console.log('📡 Respuesta del servidor:', response.status, response.statusText);
+
   if (!response.ok) {
     const error = await response.json();
+    console.error('❌ Error del servidor:', error);
     throw new Error(error.message || error.detail || 'Error al iniciar sesión');
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log('✅ Login exitoso:', { user: data.user.email, role: data.user.role });
+  return data;
 }
 
 /**

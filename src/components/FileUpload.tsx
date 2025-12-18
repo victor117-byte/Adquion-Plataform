@@ -17,7 +17,7 @@ export const FileUpload = () => {
   const [files, setFiles] = useState<FileWithProgress[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
@@ -186,7 +186,7 @@ export const FileUpload = () => {
         });
       });
 
-      xhr.open('POST', `${API_URL}/documents/upload`);
+      xhr.open('POST', `${API_URL}/api/documents/upload`);
       if (token) {
         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }

@@ -62,7 +62,7 @@ export const FileHistory = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
     fetchDocuments();
@@ -93,7 +93,7 @@ export const FileHistory = () => {
         ...(searchTerm && { search: searchTerm }),
       });
 
-      const response = await fetch(`${API_URL}/documents?${params}`, {
+      const response = await fetch(`${API_URL}/api/documents?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -194,7 +194,7 @@ export const FileHistory = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/documents/${doc.id}/download`, {
+      const response = await fetch(`${API_URL}/api/documents/${doc.id}/download`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -249,7 +249,7 @@ export const FileHistory = () => {
         return;
       }
 
-      const response = await fetch(`${API_URL}/documents/${documentToDelete}`, {
+      const response = await fetch(`${API_URL}/api/documents/${documentToDelete}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
