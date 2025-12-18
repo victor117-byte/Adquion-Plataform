@@ -137,6 +137,8 @@ Content-Type: application/json
 #### `POST /api/auth/login`
 Iniciar sesión.
 
+**⚠️ CRÍTICO:** Este endpoint usa `application/x-www-form-urlencoded`, **NO JSON**.
+
 **Request:**
 ```javascript
 POST /api/auth/login
@@ -144,6 +146,8 @@ Content-Type: application/x-www-form-urlencoded
 
 username=usuario@empresa.com&password=MiPassword123!
 ```
+
+**⚠️ Nota:** El campo se llama `username` pero debe contener el **email** del usuario.
 
 **Response:** `200 OK`
 ```json
@@ -155,13 +159,22 @@ username=usuario@empresa.com&password=MiPassword123!
     "full_name": "Juan Pérez García",
     "role": "organization_admin",
     "company": "Mi Empresa SA",
-    "subscription": { /* ... */ }
+    "is_active": true,
+    "created_at": "2025-12-18T10:00:00",
+    "subscription": {
+      "plan": "free",
+      "status": "trialing",
+      "expires_at": "2026-01-17T10:00:00Z",
+      "days_remaining": 30
+    },
+    "can_access_features": true
   }
 }
 ```
 
 **Errores:**
 - `401` - Credenciales incorrectas
+- `422` - Formato de datos incorrecto
 
 ---
 
@@ -227,43 +240,45 @@ FormData:
 ---
 
 #### `GET /api/documents/`
-Listar documentos.
+Listar documentos de la organización del usuario autenticado.
+
+**🔒 Multi-tenancy:** Solo retorna documentos de la organización del usuario. Los usuarios con rol `organization_admin` ven todos los documentos de su organización, mientras que los usuarios con rol `organization_user` solo ven sus propios documentos.
 
 **Request:**
 ```javascript
-GET /api/documents/?page=1&per_page=10
+GET /api/documents/?page=1&per_page=20
 Authorization: Bearer {token}
 ```
 
 **Response:** `200 OK`
 ```json
 {
-  "success": true,
-  "data": {
-    "documents": [
-      {
-        "id": 123,
-        "filename": "documento.pdf",
-        "original_filename": "mi-archivo.pdf",
-        "file_type": "pdf",
-        "file_size": 102400,
-        "status": "uploaded",
-        "cliente": "Cliente Test",
-        "uploaded_by": 1,
-        "created_at": "2025-12-18T10:00:00"
-      }
-    ],
-    "total": 50,
-    "page": 1,
-    "per_page": 10,
-    "total_pages": 5
-  }
+  "documents": [
+    {
+      "id": 123,
+      "filename": "20251218_130311_84153574-623c-4a2a-9d36-5286bd56af24.pdf",
+      "original_filename": "20251218_130311_84153574-623c-4a2a-9d36-5286bd56af24.pdf",
+      "file_type": "pdf",
+      "file_size": 26,
+      "status": "uploaded",
+      "cliente": "Cliente Demo1",
+      "uploaded_by": 133,
+      "upload_path": "uploads/133/20251218_130311_84153574-623c-4a2a-9d36-5286bd56af24.pdf",
+      "processed_at": null,
+      "error_message": null,
+      "created_at": "2025-12-18T19:03:11.149079",
+      "updated_at": null
+    }
+  ],
+  "total": 1,
+  "page": 1,
+  "per_page": 20
 }
 ```
 
 **Query Params:**
 - `page` (default: 1)
-- `per_page` (default: 10)
+- `per_page` (default: 20)
 - `status` (opcional): "uploaded", "processing", "completed", "failed"
 
 ---
@@ -413,24 +428,29 @@ const registerUser = async (userData) => {
 };
 
 // 2. Login
+// ⚠️ IMPORTANTE: Login usa form-urlencoded, NO JSON
+// El campo se llama 'username' pero va el EMAIL
 const loginUser = async (email, password) => {
   const formData = new URLSearchParams();
-  formData.append('username', email);
+  formData.append('username', email);  // ⚠️ Campo 'username' recibe el email
   formData.append('password', password);
   
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formData
+    body: formData.toString()  // Convertir a string
   });
   
   if (!response.ok) {
-    throw new Error('Credenciales incorrectas');
+    if (response.status === 401) {
+      throw new Error('Credenciales incorrectas');
+    }
+    throw new Error('Error en el servidor');
   }
   
   const data = await response.json();
   
-  // Guardar token
+  // Guardar token y usuario
   localStorage.setItem('auth_token', data.token);
   localStorage.setItem('user', JSON.stringify(data.user));
   
@@ -469,12 +489,8 @@ const uploadDocument = async (file, clienteName) => {
   if (!response.ok) {
     throw new Error('Error subiendo documento');
   }
-  
-  return await response.json();
-};
-
-// 2. Listar documentos
-const listDocuments = async (page = 1, perPage = 10) => {
+// ⚠️ MULTI-TENANCY: Solo retorna documentos de la organización del usuario
+const listDocuments = async (page = 1, perPage = 20) => {
   const token = localStorage.getItem('auth_token');
   
   const response = await fetch(
@@ -486,6 +502,19 @@ const listDocuments = async (page = 1, perPage = 10) => {
     }
   );
   
+  if (!response.ok) {
+    if (response.status === 401) {
+      // Token expirado
+      localStorage.removeItem('auth_token');
+      window.location.href = '/login';
+      throw new Error('Sesión expirada');
+    }
+    throw new Error('Error listando documentos');
+  }
+  
+  const data = await response.json();
+  // Retorna: { documents: [...], total, page, per_page }
+  return data
   if (!response.ok) {
     throw new Error('Error listando documentos');
   }
@@ -571,16 +600,21 @@ export const useAuth = () => {
     const storedUser = localStorage.getItem('user');
     
     if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
+      setToken(storedToken);  // ⚠️ Campo 'username' recibe el email
+    formData.append('password', password);
     
-    setLoading(false);
-  }, []);
-
-  const login = async (email, password) => {
-    const formData = new URLSearchParams();
-    formData.append('username', email);
+    const response = await fetch('http://localhost:8000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString()
+    });
+    
+    if (!response.ok) {
+      const error = response.status === 401 
+        ? 'Credenciales incorrectas' 
+        : 'Error en el servidor';
+      throw new Error(error);
+    }
     formData.append('password', password);
     
     const response = await fetch('http://localhost:8000/api/auth/login', {

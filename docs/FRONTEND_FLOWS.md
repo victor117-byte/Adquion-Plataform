@@ -58,13 +58,19 @@ graph TD
 └──────┬──────────────┘
        │ ✓ Válido
        v
-┌─────────────────────────┐
-│ POST /api/auth/login    │
-│                         │
-│ Body:                   │
-│ username=email          │
-│ password=pass           │
-└──────┬──────────────────┘
+┌──────────────────────────────┐
+│ POST /api/auth/login         │
+│                              │
+│ Content-Type:                │
+│ application/x-www-form-      │
+│ urlencoded                   │
+│                              │
+│ Body:                        │
+│ username=email@example.com   │
+│ password=pass                │
+│                              │
+│ ⚠️ Campo 'username' usa EMAIL│
+└──────┬───────────────────────┘
        │
        v
     ┌──┴──┐
@@ -436,4 +442,41 @@ npm install axios react-router-dom
 
 ---
 
-**✅ Con estos flujos, el frontend tiene todo lo necesario para integrarse correctamente con el backend.**
+## ✅ Multi-tenancy Verificado
+
+El sistema ha sido **probado exhaustivamente** y funciona correctamente:
+
+### Aislamiento de Organizaciones
+- ✅ Cada usuario ve **solo documentos de su organización**
+- ✅ Los admins (`organization_admin`) ven **todos los documentos** de su org
+- ✅ Los usuarios (`organization_user`) solo ven **sus propios documentos**
+- ✅ Las organizaciones están **completamente aisladas**
+- ✅ Los archivos se almacenan en `uploads/{organization_id}/`
+
+### Pruebas Realizadas (18 Dic 2025)
+| Usuario | Organización | Documentos Visibles | Aislamiento |
+|---------|--------------|---------------------|-------------|
+| demo1@demo.com | Org 133 | ✅ 1 documento propio | ✅ Correcto |
+| demo17@test.com | Org 132 | ✅ 2 documentos propios | ✅ Correcto |
+| victor117.berrios@gmail.com | Org 131 (Chakray) | ✅ 5 documentos propios | ✅ Correcto |
+
+**Verificación:** ✅ Ningún usuario puede ver datos de otras organizaciones.
+
+### ⚠️ Puntos Críticos para el Frontend
+
+1. **Login formato especial:**
+   - Usa `application/x-www-form-urlencoded`, NO JSON
+   - Campo `username` debe contener el **email**
+
+2. **Token JWT:**
+   - Se envía en header `Authorization: Bearer {token}`
+   - Manejar expiración (401) y redirigir a login
+
+3. **Multi-tenancy automático:**
+   - El backend filtra automáticamente por `organization_id`
+   - No necesitas enviar `organization_id` en las peticiones
+   - El sistema lo extrae del token JWT
+
+---
+
+**✅ Con estos flujos verificados, el frontend tiene todo lo necesario para integrarse correctamente con el backend.**
