@@ -17,7 +17,9 @@ interface FileWithProgress {
 
 export const FileUpload = () => {
   const [files, setFiles] = useState<FileWithProgress[]>([]);
-  const [isDragging, setIsDragging] = useState(false);  const [clienteName, setClienteName] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [clienteName, setClienteName] = useState('');
+
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -241,7 +243,7 @@ export const FileUpload = () => {
           <Input
             id="cliente-name"
             type="text"
-            placeholder="Ej: ACME Corporation, Cliente XYZ, etc."
+            placeholder="Ej: ACME Corporation, Cliente XYZ, Juan Pérez"
             value={clienteName}
             onChange={(e) => setClienteName(e.target.value)}
             className="text-base"
