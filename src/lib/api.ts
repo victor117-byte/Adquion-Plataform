@@ -60,7 +60,7 @@ export async function register(
   fullName: string,
   company: string
 ): Promise<AuthResponse> {
-  const response = await fetch(`${API_URL}/auth/register`, {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -85,7 +85,7 @@ export async function register(
  * Nota: La API espera 'username' en lugar de 'email' (OAuth2 standard)
  */
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -113,7 +113,7 @@ export async function verifySession(): Promise<User> {
     throw new Error('No hay sesión activa');
   }
 
-  const response = await fetch(`${API_URL}/auth/me`, {
+  const response = await fetch(`${API_URL}/api/auth/me`, {
     headers: getAuthHeaders(),
   });
 
@@ -141,7 +141,7 @@ export async function refreshToken(): Promise<AuthResponse> {
     throw new Error('No hay sesión activa');
   }
 
-  const response = await fetch(`${API_URL}/auth/refresh`, {
+  const response = await fetch(`${API_URL}/api/auth/refresh`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
@@ -167,7 +167,7 @@ export async function logout(): Promise<void> {
   
   if (token) {
     try {
-      await fetch(`${API_URL}/auth/logout`, {
+      await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -187,7 +187,7 @@ export async function logout(): Promise<void> {
  * GET /api/payments/subscription-status
  */
 export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
-  const response = await fetch(`${API_URL}/payments/subscription-status`, {
+  const response = await fetch(`${API_URL}/api/subscriptions/`, {
     headers: getAuthHeaders(),
   });
 
