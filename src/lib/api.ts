@@ -60,23 +60,29 @@ export async function register(
   fullName: string,
   company: string
 ): Promise<AuthResponse> {
-  const response = await fetch(`${API_URL}/auth/register`, {
+  console.log('📝 Intentando registro:', { email, fullName, company });
+  
+  const response = await fetch(`${API_URL}/api/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email,
       password,
+      name: fullName, // Según docs, puede ser 'name'
       full_name: fullName,
-      company,
+      company_name: company,
     }),
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || error.detail || 'Error al registrarse');
+    const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+    console.error('❌ Error en registro:', response.status, error);
+    throw new Error(error.message || error.detail || `Error ${response.status}: No se pudo crear la cuenta`);
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log('✅ Registro exitoso:', data.user?.email);
+  return data;
 }
 
 /**
@@ -85,7 +91,9 @@ export async function register(
  * Nota: La API espera 'username' en lugar de 'email' (OAuth2 standard)
  */
 export async function login(email: string, password: string): Promise<AuthResponse> {
-  const response = await fetch(`${API_URL}/auth/login`, {
+  console.log('🔐 Intentando login:', email);
+  
+  const response = await fetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -95,11 +103,15 @@ export async function login(email: string, password: string): Promise<AuthRespon
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || error.detail || 'Error al iniciar sesión');
+    const error = await response.json().catch(() => ({ message: 'Error desconocido' }));
+    console.error('❌ Error en login:', response.status, error);
+    throw new Error(error.message || error.detail || `Error ${response.status}: Credenciales inválidas`);
   }
 
-  return response.json();
+  const data = await response.json();
+  console.log('✅ Login exitoso. Token recibido:', data.token ? 'Sí' : 'No');
+  console.log('✅ Usuario:', data.user?.email);
+  return data;
 }
 
 /**
@@ -113,7 +125,7 @@ export async function verifySession(): Promise<User> {
     throw new Error('No hay sesión activa');
   }
 
-  const response = await fetch(`${API_URL}/auth/me`, {
+  const response = await fetch(`${API_URL}/api/auth/me`, {
     headers: getAuthHeaders(),
   });
 
@@ -141,7 +153,7 @@ export async function refreshToken(): Promise<AuthResponse> {
     throw new Error('No hay sesión activa');
   }
 
-  const response = await fetch(`${API_URL}/auth/refresh`, {
+  const response = await fetch(`${API_URL}/api/auth/refresh`, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
@@ -167,7 +179,7 @@ export async function logout(): Promise<void> {
   
   if (token) {
     try {
-      await fetch(`${API_URL}/auth/logout`, {
+      await fetch(`${API_URL}/api/auth/logout`, {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -184,10 +196,10 @@ export async function logout(): Promise<void> {
 
 /**
  * Obtener estado de suscripción
- * GET /api/payments/subscription-status
+ * GET /api/subscriptions/
  */
 export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
-  const response = await fetch(`${API_URL}/payments/subscription-status`, {
+  const response = await fetch(`${API_URL}/api/subscriptions/`, {
     headers: getAuthHeaders(),
   });
 
@@ -210,7 +222,7 @@ export async function createSubscription(
   plan: string,
   paymentMethodId: string
 ): Promise<{ success: boolean; subscription: any }> {
-  const response = await fetch(`${API_URL}/payments/create-subscription`, {
+  const response = await fetch(`${API_URL}/api/payments/create-subscription`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
