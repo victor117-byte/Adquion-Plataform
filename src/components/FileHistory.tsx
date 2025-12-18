@@ -73,6 +73,10 @@ export const FileHistory = () => {
     setLoading(true);
     const token = localStorage.getItem('token');
 
+    console.log('🔍 Consultando documentos...');
+    console.log('  Token:', token ? `${token.substring(0, 20)}...` : 'NO TOKEN');
+    console.log('  URL:', `${API_URL}/api/documents`);
+
     if (!token) {
       toast({
         title: "⚠️ No autenticado",
@@ -93,15 +97,23 @@ export const FileHistory = () => {
         ...(searchTerm && { search: searchTerm }),
       });
 
-      const response = await fetch(`${API_URL}/api/documents?${params}`, {
+      const fullUrl = `${API_URL}/api/documents?${params}`;
+      console.log('📡 Petición GET:', fullUrl);
+
+      const response = await fetch(fullUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
+      console.log('📥 Respuesta:', response.status, response.statusText);
+
       if (response.ok) {
         const data = await response.json();
-        console.log('📥 Respuesta del backend:', data);
+        console.log('📦 Data recibida:', data);
+        console.log('  Tipo:', typeof data);
+        console.log('  Es array?:', Array.isArray(data));
+        console.log('  Tiene documents?:', data?.documents ? 'Sí' : 'No');
         
         // El backend puede devolver array directo o objeto con documents
         if (Array.isArray(data)) {

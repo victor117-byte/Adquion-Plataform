@@ -3,6 +3,8 @@ import { Upload, File as FileIcon, X, CheckCircle, AlertCircle, Loader2 } from '
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
 import { toast } from '@/hooks/use-toast';
 
 interface FileWithProgress {
@@ -15,8 +17,7 @@ interface FileWithProgress {
 
 export const FileUpload = () => {
   const [files, setFiles] = useState<FileWithProgress[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
-
+  const [isDragging, setIsDragging] = useState(false);  const [clienteName, setClienteName] = useState('');
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -102,6 +103,17 @@ export const FileUpload = () => {
   const uploadFile = async (fileItem: FileWithProgress) => {
     const token = localStorage.getItem('token');
 
+    // Validar que se haya ingresado el nombre del cliente
+    if (!clienteName || clienteName.trim() === '') {
+      toast({
+        title: "⚠️ Nombre del cliente requerido",
+        description: "Por favor ingresa el nombre del cliente antes de subir archivos",
+        variant: "destructive",
+      });
+      setFiles(prev => prev.filter(f => f.id !== fileItem.id));
+      return;
+    }
+
     // Actualizar estado a "uploading"
     setFiles(prev =>
       prev.map(f => (f.id === fileItem.id ? { ...f, status: 'uploading' as const } : f))
@@ -110,8 +122,10 @@ export const FileUpload = () => {
     try {
       const formData = new FormData();
       formData.append('file', fileItem.file);
-      // El backend requiere el campo 'cliente'
-      formData.append('cliente', 'Web Upload');
+      // El backend requiere el campo 'cliente' (nombre del cliente específico del documento)
+      formData.append('cliente', clienteName.trim());
+      
+      console.log('📤 Subiendo archivo con cliente:', clienteName.trim());
 
       const xhr = new XMLHttpRequest();
       let completed = false;
@@ -218,13 +232,34 @@ export const FileUpload = () => {
 
   return (
     <div className="space-y-6">
+      {/* Campo de nombre del cliente */}
+      <Card className="p-6">
+        <div className="space-y-2">
+          <Label htmlFor="cliente-name" className="text-base font-semibold">
+            Nombre del Cliente <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="cliente-name"
+            type="text"
+            placeholder="Ej: ACME Corporation, Cliente XYZ, etc."
+            value={clienteName}
+            onChange={(e) => setClienteName(e.target.value)}
+            className="text-base"
+            required
+          />
+          <p className="text-sm text-muted-foreground">
+            Ingresa el nombre del cliente para quien subes estos documentos
+          </p>
+        </div>
+      </Card>
+
       {/* Zona de arrastre */}
       <Card
         className={`border-2 border-dashed p-12 text-center transition-all ${
           isDragging
             ? 'border-primary bg-primary/5 scale-105'
             : 'border-border hover:border-primary/50'
-        }`}
+        } ${!clienteName ? 'opacity-50 pointer-events-none' : ''}`}
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -244,12 +279,14 @@ export const FileUpload = () => {
           accept=".pdf,application/pdf"
           onChange={handleFileSelect}
           className="hidden"
+          disabled={!clienteName}
         />
         <Button
           type="button"
           variant="hero"
           size="lg"
           onClick={() => document.getElementById('file-input')?.click()}
+          disabled={!clienteName}
         >
           <Upload className="mr-2 h-5 w-5" />
           Seleccionar Archivos

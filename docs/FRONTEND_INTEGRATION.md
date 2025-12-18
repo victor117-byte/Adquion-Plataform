@@ -244,9 +244,25 @@ Listar documentos de la organización del usuario autenticado.
 
 **🔒 Multi-tenancy:** Solo retorna documentos de la organización del usuario. Los usuarios con rol `organization_admin` ven todos los documentos de su organización, mientras que los usuarios con rol `organization_user` solo ven sus propios documentos.
 
+**⚠️ IMPORTANTE - Campo `cliente`:**
+- El parámetro `cliente` NO es la organización
+- `cliente` = Nombre del cliente específico del documento (ej: "Empresa ABC", "Juan Pérez")
+- El filtro por organización es **automático** vía token JWT (organization_id)
+- Si NO envías `cliente`, verás TODOS los documentos de tu organización
+- Si SÍ envías `cliente="Empresa ABC"`, solo verás documentos de ese cliente específico
+
 **Request:**
 ```javascript
+// Ver TODOS los documentos de mi organización
 GET /api/documents/?page=1&per_page=20
+Authorization: Bearer {token}
+
+// Filtrar solo documentos del cliente "Empresa ABC"
+GET /api/documents/?page=1&per_page=20&cliente=Empresa%20ABC
+Authorization: Bearer {token}
+
+// Ver solo MIS documentos (como usuario normal)
+GET /api/documents/?page=1&per_page=20&my_documents=true
 Authorization: Bearer {token}
 ```
 
@@ -277,9 +293,12 @@ Authorization: Bearer {token}
 ```
 
 **Query Params:**
-- `page` (default: 1)
-- `per_page` (default: 20)
+- `page` (default: 1) - Número de página
+- `per_page` (default: 20) - Documentos por página
+- `cliente` (opcional) - Filtrar por nombre de cliente específico del documento
 - `status` (opcional): "uploaded", "processing", "completed", "failed"
+- `file_type` (opcional): "pdf", "xml", "txt", etc.
+- `my_documents` (opcional, bool) - Solo mis documentos (admin puede usarlo para ver solo suyos)
 
 ---
 
