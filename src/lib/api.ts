@@ -204,27 +204,14 @@ export async function getSubscriptionStatus(): Promise<SubscriptionStatus> {
 
 /**
  * Crear suscripción de pago
- * POST /api/payments/create-subscription
+ * TODO: Endpoint no documentado aún en el backend
  */
 export async function createSubscription(
   plan: string,
   paymentMethodId: string
 ): Promise<{ success: boolean; subscription: any }> {
-  const response = await fetch(`${API_URL}/payments/create-subscription`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify({
-      plan,
-      payment_method_id: paymentMethodId,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || error.detail || 'Error al crear suscripción');
-  }
-
-  return response.json();
+  // Endpoint pendiente de implementación en backend
+  throw new Error('Funcionalidad de pago no implementada aún');
 }
 
 // ==================== UTILIDADES ====================
