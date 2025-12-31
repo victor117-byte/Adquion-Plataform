@@ -12,7 +12,7 @@ export const Footer = () => {
               <span className="font-bold text-xl">Adquion</span>
             </div>
             <p className="text-sm text-muted-foreground max-w-md">
-              Automatización fiscal con IA. Scraping SAT, notificaciones inteligentes 
+              Automatización fiscal inteligente. Scraping SAT, notificaciones 
               y reportes en tiempo real para contadores profesionales.
             </p>
           </div>
