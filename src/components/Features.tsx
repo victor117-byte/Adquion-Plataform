@@ -14,7 +14,7 @@ const features = [
   },
   {
     icon: Shield,
-    title: "Notificaciones Inteligentes",
+    title: "Notificaciones Automáticas",
     description: "Alertas por WhatsApp y Email. Mantén a tus clientes informados automáticamente.",
   },
 ];
