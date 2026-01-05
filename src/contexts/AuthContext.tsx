@@ -118,7 +118,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       // Verificar si tiene suscripción activa
       if (data.user.subscription?.status === 'active') {
-        navigate('/dashboard');
+        navigate('/main');
       } else {
         navigate('/onboarding');
       }
