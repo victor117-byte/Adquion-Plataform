@@ -75,16 +75,16 @@ export default function Onboarding() {
   const handlePlanSelect = (planId: string) => {
     setSelectedPlan(planId);
     
-    // Si es plan gratuito, ir directo al dashboard
+    // Si es plan gratuito, ir directo al main
     if (planId === 'basic') {
-      navigate('/dashboard');
+      navigate('/main');
     } else {
       setShowPayment(true);
     }
   };
 
   const handlePaymentSuccess = () => {
-    navigate('/dashboard');
+    navigate('/main');
   };
 
   if (!user) {
@@ -166,7 +166,7 @@ export default function Onboarding() {
             <div className="text-center mt-8">
               <Button
                 variant="ghost"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/main')}
               >
                 Decidir más tarde
               </Button>
