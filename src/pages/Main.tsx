@@ -7,6 +7,7 @@ import {
   FileText, 
   Zap, 
   Bell, 
+  BarChart3,
   LogOut,
   Menu,
   ChevronLeft
@@ -23,8 +24,9 @@ import { ContributorsSection } from "@/components/main/ContributorsSection";
 import { DocumentsSection } from "@/components/main/DocumentsSection";
 import { AutomationsSection } from "@/components/main/AutomationsSection";
 import { NotificationsSection } from "@/components/main/NotificationsSection";
+import { PowerBISection } from "@/components/main/PowerBISection";
 
-type SectionType = 'dashboard' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications';
+type SectionType = 'dashboard' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications' | 'powerbi';
 
 interface NavItem {
   id: SectionType;
@@ -40,6 +42,7 @@ const navItems: NavItem[] = [
   { id: 'documents', label: 'Documentos', icon: FileText },
   { id: 'automations', label: 'Automatizaciones', icon: Zap },
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
+  { id: 'powerbi', label: 'Power BI', icon: BarChart3 },
 ];
 
 export default function Main() {
@@ -77,6 +80,8 @@ export default function Main() {
         return <AutomationsSection />;
       case 'notifications':
         return <NotificationsSection />;
+      case 'powerbi':
+        return <PowerBISection />;
       default:
         return <DashboardSection />;
     }
