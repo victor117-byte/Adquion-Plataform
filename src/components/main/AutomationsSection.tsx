@@ -399,217 +399,278 @@ export function AutomationsSection() {
   const scriptsNoConfigurados = scriptsDisponibles.filter(s => !s.configurado);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Automatizaciones</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Automatizaciones</h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
           Gestiona las automatizaciones productivas de tu organización
         </p>
       </div>
 
       {/* Scripts Disponibles */}
       {scriptsNoConfigurados.length > 0 && (
-        <Card className="p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <FileCode className="h-5 w-5" />
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <FileCode className="h-5 w-5 text-primary" />
+            <h3 className="text-lg font-semibold">
               Scripts Disponibles ({scriptsNoConfigurados.length})
             </h3>
-            <p className="text-sm text-muted-foreground">
-              Scripts productivos listos para configurar
-            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {scriptsNoConfigurados.map((script) => (
-              <Card key={script.script_path} className="p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-2">
-                  <FileCode className="h-8 w-8 text-primary" />
-                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Sin configurar</Badge>
+              <Card 
+                key={script.script_path} 
+                className="p-4 md:p-5 hover:shadow-lg transition-all cursor-pointer active:scale-95"
+                onClick={() => abrirDialogConfig(script)}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="p-3 bg-primary/10 rounded-xl">
+                    <FileCode className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+                  </div>
+                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    Nuevo
+                  </Badge>
                 </div>
-                <h4 className="font-semibold mb-1 capitalize">{script.nombre_display}</h4>
-                <p className="text-xs text-muted-foreground mb-3">
-                  <code className="bg-muted px-1 py-0.5 rounded">{script.script_path}</code>
+                <h4 className="font-semibold text-base md:text-lg mb-2 capitalize">
+                  {script.nombre_display}
+                </h4>
+                <p className="text-xs text-muted-foreground mb-4">
+                  <code className="bg-muted px-1.5 py-0.5 rounded text-[10px] md:text-xs">
+                    {script.script_path}
+                  </code>
                 </p>
                 <Button
-                  size="sm"
-                  onClick={() => abrirDialogConfig(script)}
-                  className="w-full"
+                  size="lg"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    abrirDialogConfig(script);
+                  }}
+                  className="w-full h-11 md:h-12 text-base"
                 >
-                  <Settings2 className="h-4 w-4 mr-2" />
+                  <Settings2 className="h-5 w-5 mr-2" />
                   Configurar
                 </Button>
               </Card>
             ))}
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Automatizaciones Configuradas */}
-      <Card className="p-6">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
-            Automatizaciones Configuradas ({automatizaciones.length})
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-primary" />
+          <h3 className="text-lg font-semibold">
+            Automatizaciones Activas ({automatizaciones.length})
           </h3>
         </div>
 
         {automatizaciones.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed rounded-lg">
-            <Settings2 className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-            <h3 className="text-lg font-medium mb-1">No hay automatizaciones configuradas</h3>
-            <p className="text-sm text-muted-foreground">
+          <Card className="p-8 md:p-12 text-center border-2 border-dashed">
+            <Settings2 className="h-16 w-16 md:h-20 md:w-20 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg md:text-xl font-medium mb-2">No hay automatizaciones configuradas</h3>
+            <p className="text-sm md:text-base text-muted-foreground">
               Configura un script disponible para comenzar
             </p>
-          </div>
+          </Card>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Automatización</TableHead>
-                <TableHead>Cron</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Última Ejecución</TableHead>
-                <TableHead>Estadísticas</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {automatizaciones.map((auto) => (
-                <TableRow key={auto.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium capitalize">{auto.nombre_display}</div>
-                      <div className="text-sm text-muted-foreground">{auto.descripcion}</div>
-                      <code className="text-xs bg-muted px-1 py-0.5 rounded">{auto.script_path}</code>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+            {automatizaciones.map((auto) => (
+              <Card key={auto.id} className="p-4 md:p-6 hover:shadow-lg transition-all">
+                <div className="space-y-4">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-base md:text-lg capitalize truncate">
+                        {auto.nombre_display}
+                      </h4>
+                      <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 mt-1">
+                        {auto.descripcion}
+                      </p>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <code className="text-xs">{auto.cron_expresion}</code>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <Switch
                         checked={auto.activo}
                         onCheckedChange={() => toggleActivo(auto.id, auto.activo)}
+                        className="data-[state=checked]:bg-green-500"
                       />
-                      <Badge className={auto.activo ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"}>
-                        {auto.activo ? 'Activo' : 'Inactivo'}
-                      </Badge>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    {auto.ultima_ejecucion ? (
-                      <div>
-                        <div className="text-sm">{new Date(auto.ultima_ejecucion).toLocaleString()}</div>
+                  </div>
+
+                  {/* Estado */}
+                  <div className="flex items-center gap-2">
+                    <Badge className={auto.activo 
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs md:text-sm px-3 py-1" 
+                      : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 text-xs md:text-sm px-3 py-1"
+                    }>
+                      {auto.activo ? '● Activo' : '○ Inactivo'}
+                    </Badge>
+                    <div className="flex items-center gap-1.5 text-xs md:text-sm text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                      <code className="text-[10px] md:text-xs">{auto.cron_expresion}</code>
+                    </div>
+                  </div>
+
+                  {/* Última Ejecución */}
+                  {auto.ultima_ejecucion ? (
+                    <div className="bg-muted/50 rounded-lg p-3">
+                      <div className="text-xs text-muted-foreground mb-1">Última ejecución</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs md:text-sm">
+                          {new Date(auto.ultima_ejecucion).toLocaleDateString('es-MX', {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
                         {getEstadoBadge(auto.ultima_estado)}
                       </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Sin ejecuciones</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-xs">
-                      <div>Total: {auto.total_ejecuciones}</div>
-                      <div className="text-green-600">✓ {auto.ejecuciones_exitosas}</div>
-                      <div className="text-red-600">✗ {auto.ejecuciones_error}</div>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => ejecutarManual(auto.id, auto.nombre_display)}
-                        title="Ejecutar ahora"
-                      >
-                        <Play className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => abrirDialogLogs(auto)}
-                        title="Ver logs"
-                      >
-                        <Calendar className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => abrirDialogEdit(auto)}
-                        title="Editar"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => eliminarAutomatizacion(auto.id, auto.nombre_display)}
-                        className="text-destructive hover:text-destructive"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  ) : (
+                    <div className="bg-muted/30 rounded-lg p-3 text-center">
+                      <span className="text-xs md:text-sm text-muted-foreground">Sin ejecuciones aún</span>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  )}
+
+                  {/* Estadísticas */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2.5 text-center">
+                      <div className="text-lg md:text-xl font-bold text-blue-600 dark:text-blue-400">
+                        {auto.total_ejecuciones}
+                      </div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground">Total</div>
+                    </div>
+                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2.5 text-center">
+                      <div className="text-lg md:text-xl font-bold text-green-600 dark:text-green-400">
+                        {auto.ejecuciones_exitosas}
+                      </div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground">Exitosas</div>
+                    </div>
+                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2.5 text-center">
+                      <div className="text-lg md:text-xl font-bold text-red-600 dark:text-red-400">
+                        {auto.ejecuciones_error}
+                      </div>
+                      <div className="text-[10px] md:text-xs text-muted-foreground">Errores</div>
+                    </div>
+                  </div>
+
+                  {/* Acciones */}
+                  <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => ejecutarManual(auto.id, auto.nombre_display)}
+                      className="h-11 md:h-12 active:scale-95 transition-transform"
+                    >
+                      <Play className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                      Ejecutar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => abrirDialogLogs(auto)}
+                      className="h-11 md:h-12 active:scale-95 transition-transform"
+                    >
+                      <Calendar className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                      Logs
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => abrirDialogEdit(auto)}
+                      className="h-11 md:h-12 active:scale-95 transition-transform"
+                    >
+                      <Edit className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={() => eliminarAutomatizacion(auto.id, auto.nombre_display)}
+                      className="h-11 md:h-12 text-destructive hover:text-destructive active:scale-95 transition-transform"
+                    >
+                      <Trash2 className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                      Eliminar
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         )}
-      </Card>
+      </div>
 
       {/* Dialog Configurar */}
       <Dialog open={dialogConfigOpen} onOpenChange={setDialogConfigOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Configurar Automatización</DialogTitle>
+            <DialogTitle className="text-xl">Configurar Automatización</DialogTitle>
           </DialogHeader>
           {scriptSeleccionado && (
-            <div className="space-y-4 py-4">
-              <div>
-                <h4 className="font-semibold capitalize">{scriptSeleccionado.nombre_display}</h4>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{scriptSeleccionado.script_path}</code>
+            <div className="space-y-5 py-2">
+              <div className="bg-muted/50 rounded-lg p-4">
+                <h4 className="font-semibold text-lg capitalize mb-2">{scriptSeleccionado.nombre_display}</h4>
+                <code className="text-xs bg-background px-2 py-1 rounded border">
+                  {scriptSeleccionado.script_path}
+                </code>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="descripcion">Descripción</Label>
+                <Label htmlFor="descripcion" className="text-base">Descripción</Label>
                 <Textarea
                   id="descripcion"
                   value={formConfig.descripcion}
                   onChange={(e) => setFormConfig({ ...formConfig, descripcion: e.target.value })}
                   placeholder="Describe qué hace esta automatización"
-                  rows={3}
+                  rows={4}
+                  className="text-base resize-none"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cron">Expresión Cron</Label>
+                <Label htmlFor="cron" className="text-base">¿Cuándo ejecutar?</Label>
                 <Input
                   id="cron"
                   value={formConfig.cron_expresion}
                   onChange={(e) => setFormConfig({ ...formConfig, cron_expresion: e.target.value })}
                   placeholder="0 2 * * *"
+                  className="text-base h-12"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Ejemplos: <code>0 2 * * *</code> (diario 2am), <code>0 */6 * * *</code> (cada 6 horas)
-                </p>
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 space-y-1">
+                  <p className="text-xs font-medium text-blue-900 dark:text-blue-200">Ejemplos comunes:</p>
+                  <div className="space-y-1 text-xs text-blue-800 dark:text-blue-300">
+                    <div><code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">0 2 * * *</code> - Diario a las 2am</div>
+                    <div><code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">0 */6 * * *</code> - Cada 6 horas</div>
+                    <div><code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">0 9 * * 1</code> - Lunes a las 9am</div>
+                  </div>
+                </div>
               </div>
 
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-3">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  ⚠️ La automatización se creará <strong>deshabilitada por defecto</strong>. Actívala después de probarla.
-                </p>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <span className="text-2xl">⚠️</span>
+                  <div className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <p className="font-medium mb-1">Importante</p>
+                    <p>La automatización se creará <strong>deshabilitada por defecto</strong>. Deberás activarla manualmente después de probarla.</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDialogConfigOpen(false)}>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setDialogConfigOpen(false)}
+                  className="h-12 text-base order-2 sm:order-1"
+                >
                   Cancelar
                 </Button>
-                <Button onClick={configurarAutomatizacion}>
-                  Configurar
+                <Button 
+                  onClick={configurarAutomatizacion}
+                  className="h-12 text-base order-1 sm:order-2 flex-1"
+                >
+                  <Settings2 className="h-5 w-5 mr-2" />
+                  Configurar Automatización
                 </Button>
               </div>
             </div>
@@ -619,51 +680,64 @@ export function AutomationsSection() {
 
       {/* Dialog Logs */}
       <Dialog open={dialogLogsOpen} onOpenChange={setDialogLogsOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Historial de Ejecuciones - {automatizacionSeleccionada?.nombre_display}
+            <DialogTitle className="text-lg md:text-xl">
+              Historial - {automatizacionSeleccionada?.nombre_display}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {logs.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No hay ejecuciones registradas</p>
+              <div className="text-center py-12">
+                <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground">No hay ejecuciones registradas</p>
+              </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Duración</TableHead>
-                    <TableHead>Detalles</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {logs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>{getEstadoBadge(log.estado)}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>Inicio: {new Date(log.fecha_inicio).toLocaleString()}</div>
-                          <div className="text-muted-foreground">Fin: {new Date(log.fecha_fin).toLocaleString()}</div>
+              <div className="space-y-3">
+                {logs.map((log) => (
+                  <Card key={log.id} className="p-4">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs md:text-sm text-muted-foreground mb-1">
+                            {new Date(log.fecha_inicio).toLocaleString('es-MX', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {getEstadoBadge(log.estado)}
+                            <Badge variant="outline" className="text-xs">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {log.duracion_segundos}s
+                            </Badge>
+                          </div>
                         </div>
-                      </TableCell>
-                      <TableCell>{log.duracion_segundos}s</TableCell>
-                      <TableCell>
-                        {log.error_mensaje ? (
-                          <div className="text-xs text-red-600 max-w-md">
-                            <strong>Error:</strong> {log.error_mensaje}
+                      </div>
+                      
+                      {log.error_mensaje && (
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                          <div className="text-xs font-medium text-red-900 dark:text-red-200 mb-1">Error:</div>
+                          <div className="text-xs text-red-800 dark:text-red-300 break-words">
+                            {log.error_mensaje}
                           </div>
-                        ) : (
-                          <div className="text-xs text-muted-foreground max-w-md truncate">
-                            {log.output || 'Sin output'}
+                        </div>
+                      )}
+                      
+                      {log.output && !log.error_mensaje && (
+                        <div className="bg-muted/50 rounded-lg p-3">
+                          <div className="text-xs text-muted-foreground break-words font-mono">
+                            {log.output}
                           </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                ))}
+              </div>
             )}
           </div>
         </DialogContent>
@@ -671,41 +745,54 @@ export function AutomationsSection() {
 
       {/* Dialog Editar */}
       <Dialog open={dialogEditOpen} onOpenChange={setDialogEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar Automatización</DialogTitle>
+            <DialogTitle className="text-xl">Editar Automatización</DialogTitle>
           </DialogHeader>
           {automatizacionSeleccionada && (
-            <div className="space-y-4 py-4">
-              <div>
-                <h4 className="font-semibold capitalize">{automatizacionSeleccionada.nombre_display}</h4>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{automatizacionSeleccionada.script_path}</code>
+            <div className="space-y-5 py-2">
+              <div className="bg-muted/50 rounded-lg p-4">
+                <h4 className="font-semibold text-lg capitalize mb-2">
+                  {automatizacionSeleccionada.nombre_display}
+                </h4>
+                <code className="text-xs bg-background px-2 py-1 rounded border">
+                  {automatizacionSeleccionada.script_path}
+                </code>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-descripcion">Descripción</Label>
+                <Label htmlFor="edit-descripcion" className="text-base">Descripción</Label>
                 <Textarea
                   id="edit-descripcion"
                   value={formEdit.descripcion}
                   onChange={(e) => setFormEdit({ ...formEdit, descripcion: e.target.value })}
-                  rows={3}
+                  rows={4}
+                  className="text-base resize-none"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-cron">Expresión Cron</Label>
+                <Label htmlFor="edit-cron" className="text-base">Expresión Cron</Label>
                 <Input
                   id="edit-cron"
                   value={formEdit.cron_expresion}
                   onChange={(e) => setFormEdit({ ...formEdit, cron_expresion: e.target.value })}
+                  className="text-base h-12"
                 />
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDialogEditOpen(false)}>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setDialogEditOpen(false)}
+                  className="h-12 text-base order-2 sm:order-1"
+                >
                   Cancelar
                 </Button>
-                <Button onClick={editarAutomatizacion}>
+                <Button 
+                  onClick={editarAutomatizacion}
+                  className="h-12 text-base order-1 sm:order-2 flex-1"
+                >
                   Guardar Cambios
                 </Button>
               </div>

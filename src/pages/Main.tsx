@@ -52,6 +52,7 @@ export default function Main() {
   const { user, logout, loading } = useAuth();
   const [activeSection, setActiveSection] = useState<SectionType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hasReportes, setHasReportes] = useState(false);
   const [checkingReportes, setCheckingReportes] = useState(true);
 
@@ -137,33 +138,55 @@ export default function Main() {
 
   return (
     <div className="min-h-screen bg-background flex">
+      {/* Mobile Menu Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="fixed top-4 left-4 z-50 md:hidden"
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+      >
+        <Menu className="h-6 w-6" />
+      </Button>
+
+      {/* Overlay para cerrar menú móvil */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside 
         className={cn(
           "fixed left-0 top-0 h-full border-r border-border bg-card transition-all duration-300 z-50",
-          sidebarCollapsed ? "w-16" : "w-64"
+          // Desktop
+          "hidden md:block",
+          sidebarCollapsed ? "md:w-16" : "md:w-64",
+          // Mobile
+          mobileMenuOpen ? "block w-64" : "hidden"
         )}
       >
         {/* Logo */}
         <div className={cn(
           "flex items-center gap-3 p-4 border-b border-border",
-          sidebarCollapsed && "justify-center"
+          sidebarCollapsed && "md:justify-center"
         )}>
           <div className="p-2 bg-gradient-to-br from-primary to-primary-hover rounded-xl shrink-0">
             <LayoutDashboard className="h-5 w-5 text-primary-foreground" />
           </div>
-          {!sidebarCollapsed && (
+          {(!sidebarCollapsed || mobileMenuOpen) && (
             <span className="font-bold text-xl text-foreground">
               Adquion
             </span>
           )}
         </div>
 
-        {/* Toggle Button */}
+        {/* Toggle Button - Solo desktop */}
         <Button
           variant="ghost"
           size="sm"
-          className="absolute -right-3 top-20 h-6 w-6 rounded-full border border-border bg-background p-0 shadow-sm"
+          className="hidden md:block absolute -right-3 top-20 h-6 w-6 rounded-full border border-border bg-background p-0 shadow-sm"
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
         >
           {sidebarCollapsed ? (
@@ -174,30 +197,33 @@ export default function Main() {
         </Button>
         
         {/* Navigation */}
-        <nav className="p-3 space-y-1">
+        <nav className="p-3 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
           {filteredNavItems.map((item) => (
             <Button 
               key={item.id}
               variant={activeSection === item.id ? "default" : "ghost"} 
               className={cn(
-                "w-full justify-start",
-                sidebarCollapsed && "justify-center px-2"
+                "w-full justify-start text-base md:text-sm h-12 md:h-10",
+                sidebarCollapsed && "md:justify-center md:px-2"
               )}
-              onClick={() => setActiveSection(item.id)}
+              onClick={() => {
+                setActiveSection(item.id);
+                setMobileMenuOpen(false);
+              }}
               title={sidebarCollapsed ? item.label : undefined}
             >
-              <item.icon className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")} />
-              {!sidebarCollapsed && <span>{item.label}</span>}
+              <item.icon className={cn("h-5 w-5 md:h-4 md:w-4", (!sidebarCollapsed || mobileMenuOpen) && "mr-3")} />
+              {(!sidebarCollapsed || mobileMenuOpen) && <span>{item.label}</span>}
             </Button>
           ))}
         </nav>
         
         {/* User Info & Logout */}
         <div className={cn(
-          "absolute bottom-0 left-0 right-0 p-3 border-t border-border",
-          sidebarCollapsed && "flex flex-col items-center"
+          "absolute bottom-0 left-0 right-0 p-3 border-t border-border bg-card",
+          sidebarCollapsed && "md:flex md:flex-col md:items-center"
         )}>
-          {!sidebarCollapsed && (
+          {(!sidebarCollapsed || mobileMenuOpen) && (
             <div className="mb-3 px-3">
               <p className="text-sm font-medium truncate">{user.nombre}</p>
               <p className="text-xs text-muted-foreground truncate">{user.correo}</p>
@@ -209,14 +235,14 @@ export default function Main() {
           <Button 
             variant="ghost" 
             className={cn(
-              "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10",
-              sidebarCollapsed && "justify-center px-2"
+              "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 h-12 md:h-10",
+              sidebarCollapsed && "md:justify-center md:px-2"
             )}
             onClick={logout}
             title={sidebarCollapsed ? "Cerrar Sesión" : undefined}
           >
-            <LogOut className={cn("h-4 w-4", !sidebarCollapsed && "mr-3")} />
-            {!sidebarCollapsed && <span>Cerrar Sesión</span>}
+            <LogOut className={cn("h-5 w-5 md:h-4 md:w-4", (!sidebarCollapsed || mobileMenuOpen) && "mr-3")} />
+            {(!sidebarCollapsed || mobileMenuOpen) && <span>Cerrar Sesión</span>}
           </Button>
         </div>
       </aside>
@@ -224,9 +250,10 @@ export default function Main() {
       {/* Main Content */}
       <main className={cn(
         "flex-1 transition-all duration-300",
-        sidebarCollapsed ? "ml-16" : "ml-64"
+        "pt-16 md:pt-0", // Padding top en móvil para el botón de menú
+        sidebarCollapsed ? "md:ml-16" : "md:ml-64"
       )}>
-        <div className="p-6 lg:p-8">
+        <div className="p-4 md:p-6 lg:p-8">
           {renderSection()}
         </div>
       </main>
