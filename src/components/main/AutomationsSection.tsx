@@ -45,6 +45,7 @@ interface Automatizacion {
   total_ejecuciones: string;
   ejecuciones_exitosas: string;
   ejecuciones_error: string;
+  variables_personalizadas?: Record<string, string | number | boolean>;
 }
 
 interface LogEjecucion {
@@ -133,6 +134,7 @@ export function AutomationsSection() {
     cronMode: 'preset' as 'preset' | 'custom', // Modo selector visual o manual
     customHour: '09',
     customMinute: '00',
+    variables_personalizadas: {} as Record<string, string | number | boolean>,
   });
 
   const [formEdit, setFormEdit] = useState({
@@ -141,6 +143,7 @@ export function AutomationsSection() {
     cronMode: 'preset' as 'preset' | 'custom',
     customHour: '09',
     customMinute: '00',
+    variables_personalizadas: {} as Record<string, string | number | boolean>,
   });
 
   const isAdmin = currentUser?.tipo_usuario === 'administrador';
@@ -236,6 +239,7 @@ export function AutomationsSection() {
       cronMode: 'preset',
       customHour: '09',
       customMinute: '00',
+      variables_personalizadas: {},
     });
     setDialogConfigOpen(true);
   };
@@ -265,6 +269,9 @@ export function AutomationsSection() {
           descripcion: formConfig.descripcion,
           script_path: scriptSeleccionado.script_path,
           cron_expresion: formConfig.cron_expresion,
+          variables_personalizadas: Object.keys(formConfig.variables_personalizadas).length > 0 
+            ? formConfig.variables_personalizadas 
+            : undefined,
         }),
       });
 
@@ -378,6 +385,7 @@ export function AutomationsSection() {
       cronMode: 'preset',
       customHour: hour,
       customMinute: minute,
+      variables_personalizadas: auto.variables_personalizadas || {},
     });
     setDialogEditOpen(true);
   };
@@ -391,6 +399,7 @@ export function AutomationsSection() {
       cronMode: 'preset',
       customHour: '09',
       customMinute: '00',
+      variables_personalizadas: {},
     });
   };
 
@@ -418,6 +427,9 @@ export function AutomationsSection() {
           id_automatizacion: automatizacionSeleccionada.id,
           descripcion: formEdit.descripcion,
           cron_expresion: formEdit.cron_expresion,
+          variables_personalizadas: Object.keys(formEdit.variables_personalizadas).length > 0 
+            ? formEdit.variables_personalizadas 
+            : undefined,
         }),
       });
 
@@ -484,6 +496,102 @@ export function AutomationsSection() {
       return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle className="h-3 w-3 mr-1" />Exitoso</Badge>;
     }
     return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><XCircle className="h-3 w-3 mr-1" />Error</Badge>;
+  };
+
+  // Componente para editar variables personalizadas
+  const CustomVariablesEditor = ({ 
+    variables, 
+    onChange 
+  }: { 
+    variables: Record<string, string | number | boolean>;
+    onChange: (vars: Record<string, string | number | boolean>) => void;
+  }) => {
+    const [newKey, setNewKey] = useState('');
+    const [newValue, setNewValue] = useState('');
+    
+    const addVariable = () => {
+      if (!newKey.trim()) return;
+      onChange({ ...variables, [newKey]: newValue });
+      setNewKey('');
+      setNewValue('');
+    };
+    
+    const removeVariable = (key: string) => {
+      const { [key]: _, ...rest } = variables;
+      onChange(rest);
+    };
+    
+    return (
+      <div className="space-y-2">
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+            <div className="text-xs text-blue-900 dark:text-blue-200">
+              <p className="font-medium mb-1">Variables personalizadas</p>
+              <p className="text-blue-700 dark:text-blue-300">
+                Se pasan al script Python como variables de entorno con prefijo <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">SAT_VAR_</code>
+              </p>
+              <p className="text-blue-700 dark:text-blue-300 mt-1">
+                Ejemplo: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">rfc_objetivo</code> → <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">SAT_VAR_RFC_OBJETIVO</code>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {Object.keys(variables).length > 0 && (
+          <div className="space-y-2 mb-3">
+            {Object.entries(variables).map(([key, value]) => (
+              <div key={key} className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg">
+                <span className="text-xs font-mono bg-background px-2 py-1 rounded border flex-1">
+                  <span className="text-primary font-semibold">{key}</span>: {String(value)}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeVariable(key)}
+                  className="text-red-500 hover:text-red-700 h-8 w-8 p-0"
+                >
+                  <XCircle className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            type="text"
+            placeholder="Variable (ej: rfc_objetivo)"
+            value={newKey}
+            onChange={e => setNewKey(e.target.value)}
+            className="text-sm flex-1"
+          />
+          <Input
+            type="text"
+            placeholder="Valor"
+            value={newValue}
+            onChange={e => setNewValue(e.target.value)}
+            className="text-sm flex-1"
+          />
+          <Button
+            type="button"
+            onClick={addVariable}
+            variant="outline"
+            size="sm"
+            className="whitespace-nowrap"
+          >
+            + Agregar
+          </Button>
+        </div>
+
+        {Object.keys(variables).length === 0 && (
+          <p className="text-xs text-muted-foreground italic text-center py-2">
+            No hay variables personalizadas. Agrega una si tu script las requiere.
+          </p>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -696,7 +804,25 @@ export function AutomationsSection() {
                     </div>
                   </div>
 
-                  {/* Acciones */}
+                  {/* Variables personalizadas */}
+                  {auto.variables_personalizadas && Object.keys(auto.variables_personalizadas).length > 0 && (
+                    <details className="bg-muted/30 rounded-lg border-2 border-dashed">
+                      <summary className="text-xs cursor-pointer p-3 hover:bg-muted/50 transition-colors font-medium flex items-center gap-2">
+                        <Settings2 className="h-3.5 w-3.5" />
+                        Variables personalizadas ({Object.keys(auto.variables_personalizadas).length})
+                      </summary>
+                      <div className="px-3 pb-3 space-y-1.5">
+                        {Object.entries(auto.variables_personalizadas).map(([key, value]) => (
+                          <div key={key} className="text-xs font-mono bg-background px-2 py-1.5 rounded border flex items-center justify-between">
+                            <span className="text-primary font-semibold">{key}</span>
+                            <span className="text-muted-foreground">= {String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Acciones */}"
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t">
                     <Button
                       variant="outline"
@@ -968,7 +1094,19 @@ export function AutomationsSection() {
                 </div>
               </div>
 
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              {/* Variables personalizadas */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Variables Personalizadas (Opcional)
+                </Label>
+                <CustomVariablesEditor
+                  variables={formConfig.variables_personalizadas}
+                  onChange={(vars) => setFormConfig({ ...formConfig, variables_personalizadas: vars })}
+                />
+              </div>
+
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg p-4">"
                 <div className="flex gap-3">
                   <span className="text-2xl">⚠️</span>
                   <div className="text-sm text-yellow-800 dark:text-yellow-200">
@@ -1273,7 +1411,19 @@ export function AutomationsSection() {
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              {/* Variables personalizadas */}
+              <div className="space-y-2">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Settings2 className="h-4 w-4" />
+                  Variables Personalizadas (Opcional)
+                </Label>
+                <CustomVariablesEditor
+                  variables={formEdit.variables_personalizadas}
+                  onChange={(vars) => setFormEdit({ ...formEdit, variables_personalizadas: vars })}
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">"
                 <Button 
                   variant="outline" 
                   onClick={() => setDialogEditOpen(false)}
