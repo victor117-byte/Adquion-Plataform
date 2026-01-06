@@ -12,6 +12,7 @@ import {
   ChevronLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +59,7 @@ export default function Main() {
     return <Navigate to="/auth" replace />;
   }
 
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user.tipo_usuario === 'administrador';
 
   const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
 
@@ -145,8 +146,11 @@ export default function Main() {
         )}>
           {!sidebarCollapsed && (
             <div className="mb-3 px-3">
-              <p className="text-sm font-medium truncate">{user.name}</p>
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              <p className="text-sm font-medium truncate">{user.nombre}</p>
+              <p className="text-xs text-muted-foreground truncate">{user.correo}</p>
+              <Badge className="mt-1" variant={user.tipo_usuario === 'administrador' ? 'default' : 'secondary'}>
+                {user.tipo_usuario}
+              </Badge>
             </div>
           )}
           <Button 
