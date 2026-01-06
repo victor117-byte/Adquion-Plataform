@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -8,6 +8,7 @@ import {
   Zap, 
   Bell, 
   BarChart3,
+  Settings,
   LogOut,
   Menu,
   ChevronLeft
@@ -25,8 +26,9 @@ import { DocumentsSection } from "@/components/main/DocumentsSection";
 import { AutomationsSection } from "@/components/main/AutomationsSection";
 import { NotificationsSection } from "@/components/main/NotificationsSection";
 import { PowerBISection } from "@/components/main/PowerBISection";
+import { SettingsSection } from "@/components/main/SettingsSection";
 
-type SectionType = 'dashboard' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications' | 'powerbi';
+type SectionType = 'dashboard' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications' | 'powerbi' | 'settings';
 
 interface NavItem {
   id: SectionType;
@@ -42,15 +44,50 @@ const navItems: NavItem[] = [
   { id: 'documents', label: 'Documentos', icon: FileText },
   { id: 'automations', label: 'Automatizaciones', icon: Zap },
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
-  { id: 'powerbi', label: 'Power BI', icon: BarChart3 },
+  { id: 'powerbi', label: 'Reportes', icon: BarChart3 },
+  { id: 'settings', label: 'Configuración', icon: Settings, adminOnly: true },
 ];
 
 export default function Main() {
   const { user, logout, loading } = useAuth();
   const [activeSection, setActiveSection] = useState<SectionType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [hasReportes, setHasReportes] = useState(false);
+  const [checkingReportes, setCheckingReportes] = useState(true);
 
-  if (loading) {
+  useEffect(() => {
+    // Verificar si hay reportes disponibles
+    const checkReportes = async () => {
+      if (!user?.correo || !user?.organizacion) {
+        setCheckingReportes(false);
+        return;
+      }
+
+      try {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const response = await fetch(
+          `${API_URL}/reportes?correo=${encodeURIComponent(user.correo)}&organizacion=${encodeURIComponent(user.organizacion)}`
+        );
+        
+        const result = await response.json();
+        
+        if (result.success && result.data.reportes && result.data.reportes.length > 0) {
+          setHasReportes(true);
+        } else {
+          setHasReportes(false);
+        }
+      } catch (error) {
+        console.error('Error verificando reportes:', error);
+        setHasReportes(false);
+      } finally {
+        setCheckingReportes(false);
+      }
+    };
+
+    checkReportes();
+  }, [user]);
+
+  if (loading || checkingReportes) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -64,7 +101,16 @@ export default function Main() {
 
   const isAdmin = user.tipo_usuario === 'administrador';
 
-  const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  // Filtrar items del menú según permisos y disponibilidad de reportes
+  const filteredNavItems = navItems.filter(item => {
+    // Filtrar items solo para admin
+    if (item.adminOnly && !isAdmin) return false;
+    
+    // Ocultar Reportes si no hay reportes configurados (para todos los usuarios)
+    if (item.id === 'powerbi' && !hasReportes) return false;
+    
+    return true;
+  });
 
   const renderSection = () => {
     switch (activeSection) {
@@ -82,6 +128,8 @@ export default function Main() {
         return <NotificationsSection />;
       case 'powerbi':
         return <PowerBISection />;
+      case 'settings':
+        return isAdmin ? <SettingsSection /> : <Navigate to="/main" replace />;
       default:
         return <DashboardSection />;
     }
