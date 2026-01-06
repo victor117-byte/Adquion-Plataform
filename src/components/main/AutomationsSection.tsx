@@ -509,8 +509,24 @@ export function AutomationsSection() {
     const [newKey, setNewKey] = useState('');
     const [newValue, setNewValue] = useState('');
     
-    const addVariable = () => {
-      if (!newKey.trim()) return;
+    const addVariable = (e?: React.FormEvent) => {
+      e?.preventDefault();
+      if (!newKey.trim() || !newValue.trim()) {
+        toast({
+          title: "Error",
+          description: "Debes proporcionar tanto el nombre como el valor de la variable",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (variables.hasOwnProperty(newKey)) {
+        toast({
+          title: "Error",
+          description: `La variable "${newKey}" ya existe`,
+          variant: "destructive",
+        });
+        return;
+      }
       onChange({ ...variables, [newKey]: newValue });
       setNewKey('');
       setNewValue('');
@@ -519,6 +535,13 @@ export function AutomationsSection() {
     const removeVariable = (key: string) => {
       const { [key]: _, ...rest } = variables;
       onChange(rest);
+    };
+    
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addVariable();
+      }
     };
     
     return (
@@ -559,31 +582,33 @@ export function AutomationsSection() {
           </div>
         )}
         
-        <div className="flex flex-col sm:flex-row gap-2">
+        <form onSubmit={addVariable} className="flex flex-col sm:flex-row gap-2">
           <Input
             type="text"
             placeholder="Variable (ej: rfc_objetivo)"
             value={newKey}
             onChange={e => setNewKey(e.target.value)}
+            onKeyPress={handleKeyPress}
             className="text-sm flex-1"
           />
           <Input
             type="text"
-            placeholder="Valor"
+            placeholder="Valor (ej: ABC123456DEF)"
             value={newValue}
             onChange={e => setNewValue(e.target.value)}
+            onKeyPress={handleKeyPress}
             className="text-sm flex-1"
           />
           <Button
             type="button"
-            onClick={addVariable}
+            onClick={(e) => addVariable(e)}
             variant="outline"
             size="sm"
             className="whitespace-nowrap"
           >
             + Agregar
           </Button>
-        </div>
+        </form>
 
         {Object.keys(variables).length === 0 && (
           <p className="text-xs text-muted-foreground italic text-center py-2">
