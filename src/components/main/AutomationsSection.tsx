@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Play, Calendar, CheckCircle, XCircle, Clock, Edit, Trash2, Settings2, FileCode, TrendingUp } from "lucide-react";
+import { Play, Calendar, CheckCircle, XCircle, Clock, Edit, Trash2, Settings2, FileCode, TrendingUp, Sun, Moon, Timer, Repeat, Zap, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -63,6 +63,31 @@ const getHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
+// Opciones predefinidas de horarios
+const HORARIOS_COMUNES = [
+  { label: 'Cada hora', icon: Clock, cron: '0 * * * *', desc: 'Se ejecuta al inicio de cada hora' },
+  { label: 'Cada 6 horas', icon: Repeat, cron: '0 */6 * * *', desc: 'Se ejecuta 4 veces al día' },
+  { label: 'Diario 2am', icon: Moon, cron: '0 2 * * *', desc: 'Una vez al día en la madrugada' },
+  { label: 'Diario 9am', icon: Sun, cron: '0 9 * * *', desc: 'Una vez al día en la mañana' },
+  { label: 'Lunes 9am', icon: Calendar, cron: '0 9 * * 1', desc: 'Cada inicio de semana' },
+  { label: 'Cada 30 min', icon: Timer, cron: '*/30 * * * *', desc: 'Se ejecuta 48 veces al día' },
+];
+
+// Función para interpretar expresión cron
+const interpretarCron = (cron: string): string => {
+  const ejemplos: Record<string, string> = {
+    '0 * * * *': 'Cada hora',
+    '0 */6 * * *': 'Cada 6 horas',
+    '0 2 * * *': 'Diario a las 2:00 AM',
+    '0 9 * * *': 'Diario a las 9:00 AM',
+    '0 9 * * 1': 'Cada lunes a las 9:00 AM',
+    '*/30 * * * *': 'Cada 30 minutos',
+    '0 0 * * *': 'Diario a medianoche',
+    '0 12 * * *': 'Diario a las 12:00 PM',
+  };
+  return ejemplos[cron] || 'Horario personalizado';
+};
+
 export function AutomationsSection() {
   const { user: currentUser } = useAuth();
   const [scriptsDisponibles, setScriptsDisponibles] = useState<ScriptDisponible[]>([]);
@@ -78,11 +103,13 @@ export function AutomationsSection() {
   const [formConfig, setFormConfig] = useState({
     cron_expresion: '0 2 * * *',
     descripcion: '',
+    cronMode: 'preset' as 'preset' | 'custom', // Modo selector visual o manual
   });
 
   const [formEdit, setFormEdit] = useState({
     descripcion: '',
     cron_expresion: '',
+    cronMode: 'preset' as 'preset' | 'custom',
   });
 
   const isAdmin = currentUser?.tipo_usuario === 'administrador';
@@ -175,6 +202,7 @@ export function AutomationsSection() {
     setFormConfig({
       cron_expresion: '0 2 * * *',
       descripcion: script.descripcion_sugerida,
+      cronMode: 'preset',
     });
     setDialogConfigOpen(true);
   };
@@ -299,8 +327,19 @@ export function AutomationsSection() {
     setFormEdit({
       descripcion: auto.descripcion,
       cron_expresion: auto.cron_expresion,
+      cronMode: 'preset',
     });
     setDialogEditOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogConfigOpen(false);
+    setScriptSeleccionado(null);
+    setFormConfig({
+      cron_expresion: '0 2 * * *',
+      descripcion: '',
+      cronMode: 'preset',
+    });
   };
 
   const editarAutomatizacion = async () => {
@@ -467,28 +506,40 @@ export function AutomationsSection() {
 
         {automatizaciones.length === 0 ? (
           <Card className="p-8 md:p-12 text-center border-2 border-dashed">
-            <Settings2 className="h-16 w-16 md:h-20 md:w-20 mx-auto text-muted-foreground mb-4" />
+            <div className="inline-block p-6 bg-muted rounded-full mb-4">
+              <Settings2 className="h-16 w-16 md:h-20 md:w-20 text-muted-foreground" />
+            </div>
             <h3 className="text-lg md:text-xl font-medium mb-2">No hay automatizaciones configuradas</h3>
-            <p className="text-sm md:text-base text-muted-foreground">
+            <p className="text-sm md:text-base text-muted-foreground mb-4">
               Configura un script disponible para comenzar
             </p>
+            {scriptsNoConfigurados.length > 0 && (
+              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                {scriptsNoConfigurados.length} scripts disponibles
+              </Badge>
+            )}
           </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
             {automatizaciones.map((auto) => (
-              <Card key={auto.id} className="p-4 md:p-6 hover:shadow-lg transition-all">
+              <Card key={auto.id} className="p-4 md:p-6 hover:shadow-xl transition-all border-2">
                 <div className="space-y-4">
-                  {/* Header */}
+                  {/* Header con icono grande */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-base md:text-lg capitalize truncate">
-                        {auto.nombre_display}
-                      </h4>
-                      <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 mt-1">
-                        {auto.descripcion}
-                      </p>
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className={`p-3 rounded-xl ${auto.activo ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
+                        <Zap className={`h-7 w-7 ${auto.activo ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-base md:text-lg capitalize truncate">
+                          {auto.nombre_display}
+                        </h4>
+                        <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 mt-1">
+                          {auto.descripcion}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="shrink-0">
                       <Switch
                         checked={auto.activo}
                         onCheckedChange={() => toggleActivo(auto.id, auto.activo)}
@@ -497,26 +548,43 @@ export function AutomationsSection() {
                     </div>
                   </div>
 
-                  {/* Estado */}
+                  {/* Estado con icono animado */}
                   <div className="flex items-center gap-2">
                     <Badge className={auto.activo 
-                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs md:text-sm px-3 py-1" 
-                      : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 text-xs md:text-sm px-3 py-1"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs md:text-sm px-3 py-1.5 flex items-center gap-1.5" 
+                      : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 text-xs md:text-sm px-3 py-1.5 flex items-center gap-1.5"
                     }>
-                      {auto.activo ? '● Activo' : '○ Inactivo'}
+                      {auto.activo ? (
+                        <>
+                          <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          Activo
+                        </>
+                      ) : (
+                        <>
+                          <span className="inline-block w-2 h-2 bg-gray-400 rounded-full" />
+                          Inactivo
+                        </>
+                      )}
                     </Badge>
-                    <div className="flex items-center gap-1.5 text-xs md:text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1.5 text-xs md:text-sm text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
                       <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                      <code className="text-[10px] md:text-xs">{auto.cron_expresion}</code>
+                      <span className="font-medium">{interpretarCron(auto.cron_expresion)}</span>
                     </div>
                   </div>
 
-                  {/* Última Ejecución */}
+                  {/* Última Ejecución con iconos */}
                   {auto.ultima_ejecucion ? (
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <div className="text-xs text-muted-foreground mb-1">Última ejecución</div>
+                    <div className={`rounded-lg p-3 border-2 ${
+                      auto.ultima_estado === 'exitoso' 
+                        ? 'bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800' 
+                        : 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <div className="text-xs text-muted-foreground font-medium">Última ejecución</div>
+                      </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs md:text-sm">
+                        <span className="text-xs md:text-sm font-medium">
                           {new Date(auto.ultima_ejecucion).toLocaleDateString('es-MX', {
                             day: '2-digit',
                             month: 'short',
@@ -528,30 +596,40 @@ export function AutomationsSection() {
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-muted/30 rounded-lg p-3 text-center">
+                    <div className="bg-muted/30 rounded-lg p-3 text-center border-2 border-dashed">
+                      <Clock className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
                       <span className="text-xs md:text-sm text-muted-foreground">Sin ejecuciones aún</span>
                     </div>
                   )}
 
-                  {/* Estadísticas */}
+                  {/* Estadísticas con iconos mejorados */}
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2.5 text-center">
-                      <div className="text-lg md:text-xl font-bold text-blue-600 dark:text-blue-400">
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 rounded-lg p-3 text-center border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <TrendingUp className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
                         {auto.total_ejecuciones}
                       </div>
-                      <div className="text-[10px] md:text-xs text-muted-foreground">Total</div>
+                      <div className="text-[10px] md:text-xs text-blue-700 dark:text-blue-300 font-medium">Total</div>
                     </div>
-                    <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2.5 text-center">
-                      <div className="text-lg md:text-xl font-bold text-green-600 dark:text-green-400">
+                    <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10 rounded-lg p-3 text-center border border-green-200 dark:border-green-800">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="text-xl md:text-2xl font-bold text-green-600 dark:text-green-400">
                         {auto.ejecuciones_exitosas}
                       </div>
-                      <div className="text-[10px] md:text-xs text-muted-foreground">Exitosas</div>
+                      <div className="text-[10px] md:text-xs text-green-700 dark:text-green-300 font-medium">Exitosas</div>
                     </div>
-                    <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2.5 text-center">
-                      <div className="text-lg md:text-xl font-bold text-red-600 dark:text-red-400">
+                    <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-900/10 rounded-lg p-3 text-center border border-red-200 dark:border-red-800">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div className="text-xl md:text-2xl font-bold text-red-600 dark:text-red-400">
                         {auto.ejecuciones_error}
                       </div>
-                      <div className="text-[10px] md:text-xs text-muted-foreground">Errores</div>
+                      <div className="text-[10px] md:text-xs text-red-700 dark:text-red-300 font-medium">Errores</div>
                     </div>
                   </div>
 
@@ -602,47 +680,149 @@ export function AutomationsSection() {
       </div>
 
       {/* Dialog Configurar */}
-      <Dialog open={dialogConfigOpen} onOpenChange={setDialogConfigOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <Dialog open={dialogConfigOpen} onOpenChange={(open) => {
+        if (!open) closeDialog();
+        else setDialogConfigOpen(true);
+      }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">Configurar Automatización</DialogTitle>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <Settings2 className="h-6 w-6 text-primary" />
+              Configurar Automatización
+            </DialogTitle>
           </DialogHeader>
           {scriptSeleccionado && (
             <div className="space-y-5 py-2">
-              <div className="bg-muted/50 rounded-lg p-4">
-                <h4 className="font-semibold text-lg capitalize mb-2">{scriptSeleccionado.nombre_display}</h4>
-                <code className="text-xs bg-background px-2 py-1 rounded border">
-                  {scriptSeleccionado.script_path}
-                </code>
+              {/* Info del script */}
+              <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-4 border-2 border-primary/20">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2.5 bg-primary/20 rounded-lg">
+                    <FileCode className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg capitalize">{scriptSeleccionado.nombre_display}</h4>
+                    <code className="text-xs bg-background/50 px-2 py-1 rounded border">
+                      {scriptSeleccionado.script_path}
+                    </code>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="descripcion" className="text-base">Descripción</Label>
+                <Label htmlFor="descripcion" className="text-base font-semibold flex items-center gap-2">
+                  <FileCode className="h-4 w-4" />
+                  Descripción
+                </Label>
                 <Textarea
                   id="descripcion"
                   value={formConfig.descripcion}
                   onChange={(e) => setFormConfig({ ...formConfig, descripcion: e.target.value })}
                   placeholder="Describe qué hace esta automatización"
-                  rows={4}
+                  rows={3}
                   className="text-base resize-none"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="cron" className="text-base">¿Cuándo ejecutar?</Label>
-                <Input
-                  id="cron"
-                  value={formConfig.cron_expresion}
-                  onChange={(e) => setFormConfig({ ...formConfig, cron_expresion: e.target.value })}
-                  placeholder="0 2 * * *"
-                  className="text-base h-12"
-                />
-                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 space-y-1">
-                  <p className="text-xs font-medium text-blue-900 dark:text-blue-200">Ejemplos comunes:</p>
-                  <div className="space-y-1 text-xs text-blue-800 dark:text-blue-300">
-                    <div><code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">0 2 * * *</code> - Diario a las 2am</div>
-                    <div><code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">0 */6 * * *</code> - Cada 6 horas</div>
-                    <div><code className="bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded">0 9 * * 1</code> - Lunes a las 9am</div>
+              {/* Selector de horario */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  ¿Cuándo ejecutar?
+                </Label>
+                
+                {/* Tabs para selector visual o manual */}
+                <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                  <Button
+                    type="button"
+                    variant={formConfig.cronMode === 'preset' ? 'default' : 'ghost'}
+                    className="flex-1 h-10"
+                    onClick={() => setFormConfig({ ...formConfig, cronMode: 'preset' })}
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Horarios Comunes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formConfig.cronMode === 'custom' ? 'default' : 'ghost'}
+                    className="flex-1 h-10"
+                    onClick={() => setFormConfig({ ...formConfig, cronMode: 'custom' })}
+                  >
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Personalizado
+                  </Button>
+                </div>
+
+                {/* Selector visual de horarios */}
+                {formConfig.cronMode === 'preset' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {HORARIOS_COMUNES.map((horario) => {
+                      const IconComponent = horario.icon;
+                      const isSelected = formConfig.cron_expresion === horario.cron;
+                      return (
+                        <Card
+                          key={horario.cron}
+                          className={`p-4 cursor-pointer transition-all hover:shadow-lg active:scale-95 ${
+                            isSelected 
+                              ? 'border-2 border-primary bg-primary/5 shadow-md' 
+                              : 'border hover:border-primary/50'
+                          }`}
+                          onClick={() => setFormConfig({ ...formConfig, cron_expresion: horario.cron })}
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                              <IconComponent className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-semibold text-sm">{horario.label}</h5>
+                              <p className="text-xs text-muted-foreground truncate">{horario.desc}</p>
+                            </div>
+                          </div>
+                          <code className="text-[10px] bg-muted px-2 py-1 rounded block text-center">
+                            {horario.cron}
+                          </code>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Input manual */}
+                {formConfig.cronMode === 'custom' && (
+                  <div className="space-y-3">
+                    <Input
+                      value={formConfig.cron_expresion}
+                      onChange={(e) => setFormConfig({ ...formConfig, cron_expresion: e.target.value })}
+                      placeholder="* * * * *"
+                      className="text-base h-12 font-mono"
+                    />
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-blue-600" />
+                        <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                          Formato: minuto hora día mes día-semana
+                        </p>
+                      </div>
+                      <div className="space-y-1 text-xs text-blue-800 dark:text-blue-300">
+                        <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded">0 2 * * *</code> = Diario a las 2:00 AM</div>
+                        <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded">*/15 * * * *</code> = Cada 15 minutos</div>
+                        <div><code className="bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded">0 9-17 * * 1-5</code> = Cada hora 9am-5pm, L-V</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview de interpretación */}
+                <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-green-700 dark:text-green-300 font-medium">Se ejecutará:</p>
+                      <p className="text-base font-bold text-green-900 dark:text-green-100">
+                        {interpretarCron(formConfig.cron_expresion)}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -669,7 +849,7 @@ export function AutomationsSection() {
                   onClick={configurarAutomatizacion}
                   className="h-12 text-base order-1 sm:order-2 flex-1"
                 >
-                  <Settings2 className="h-5 w-5 mr-2" />
+                  <Zap className="h-5 w-5 mr-2" />
                   Configurar Automatización
                 </Button>
               </div>
