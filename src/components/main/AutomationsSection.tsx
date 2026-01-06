@@ -259,23 +259,28 @@ export function AutomationsSection() {
     }
 
     try {
+      const payload = {
+        correo_admin: currentUser?.correo,
+        organizacion: currentUser?.organizacion,
+        nombre: scriptSeleccionado.nombre_sugerido,
+        descripcion: formConfig.descripcion,
+        script_path: scriptSeleccionado.script_path,
+        cron_expresion: formConfig.cron_expresion,
+        ...(Object.keys(formConfig.variables_personalizadas || {}).length > 0 && {
+          variables_personalizadas: formConfig.variables_personalizadas
+        })
+      };
+
+      console.log('📤 Enviando configuración:', payload);
+
       const response = await fetch(`${API_URL}/automatizaciones`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({
-          correo_admin: currentUser?.correo,
-          organizacion: currentUser?.organizacion,
-          nombre: scriptSeleccionado.nombre_sugerido,
-          descripcion: formConfig.descripcion,
-          script_path: scriptSeleccionado.script_path,
-          cron_expresion: formConfig.cron_expresion,
-          variables_personalizadas: Object.keys(formConfig.variables_personalizadas).length > 0 
-            ? formConfig.variables_personalizadas 
-            : undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
+      console.log('📥 Respuesta del servidor:', result);
       
       if (result.success) {
         toast({
@@ -418,22 +423,27 @@ export function AutomationsSection() {
     }
 
     try {
+      const payload = {
+        correo_admin: currentUser?.correo,
+        organizacion: currentUser?.organizacion,
+        id_automatizacion: automatizacionSeleccionada.id,
+        descripcion: formEdit.descripcion,
+        cron_expresion: formEdit.cron_expresion,
+        ...(Object.keys(formEdit.variables_personalizadas || {}).length > 0 && {
+          variables_personalizadas: formEdit.variables_personalizadas
+        })
+      };
+
+      console.log('📤 Editando automatización:', payload);
+
       const response = await fetch(`${API_URL}/automatizaciones`, {
         method: 'PATCH',
         headers: getHeaders(),
-        body: JSON.stringify({
-          correo_admin: currentUser?.correo,
-          organizacion: currentUser?.organizacion,
-          id_automatizacion: automatizacionSeleccionada.id,
-          descripcion: formEdit.descripcion,
-          cron_expresion: formEdit.cron_expresion,
-          variables_personalizadas: Object.keys(formEdit.variables_personalizadas).length > 0 
-            ? formEdit.variables_personalizadas 
-            : undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
+      console.log('📥 Respuesta del servidor:', result);
       
       if (result.success) {
         toast({
