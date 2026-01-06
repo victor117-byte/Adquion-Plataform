@@ -13,9 +13,16 @@ export default function Auth() {
   const mode = searchParams.get("mode") || "login";
   const { user, login, register, resetPassword } = useAuth();
   
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  // Estados para login
+  const [organizacion, setOrganizacion] = useState("");
+  const [correo, setCorreo] = useState("");
+  const [contraseña, setContraseña] = useState("");
+  
+  // Estados adicionales para registro
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [fechaNacimiento, setFechaNacimiento] = useState("");
+  
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
 
@@ -27,7 +34,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
+      await login(organizacion, correo, contraseña);
     } finally {
       setLoading(false);
     }
@@ -37,7 +44,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await register(email, password, name);
+      await register(organizacion, nombre, correo, contraseña, telefono, fechaNacimiento);
     } finally {
       setLoading(false);
     }
@@ -47,7 +54,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await resetPassword(email);
+      await resetPassword(correo);
       setResetMode(false);
     } finally {
       setLoading(false);
@@ -92,8 +99,8 @@ export default function Auth() {
                       id="reset-email"
                       type="email"
                       placeholder="tu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={correo}
+                      onChange={(e) => setCorreo(e.target.value)}
                       required
                     />
                   </div>
@@ -113,13 +120,24 @@ export default function Auth() {
               ) : (
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="organizacion">Organización</Label>
+                    <Input
+                      id="organizacion"
+                      type="text"
+                      placeholder="mi_empresa"
+                      value={organizacion}
+                      onChange={(e) => setOrganizacion(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Correo</Label>
                     <Input
                       id="email"
                       type="email"
                       placeholder="tu@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={correo}
+                      onChange={(e) => setCorreo(e.target.value)}
                       required
                     />
                   </div>
@@ -129,10 +147,10 @@ export default function Auth() {
                       id="password"
                       type="password"
                       placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      value={contraseña}
+                      onChange={(e) => setContraseña(e.target.value)}
                       required
-                      minLength={6}
+                      minLength={8}
                     />
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -155,24 +173,57 @@ export default function Auth() {
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="signup-organizacion">Organización</Label>
+                  <Input
+                    id="signup-organizacion"
+                    type="text"
+                    placeholder="mi_empresa"
+                    value={organizacion}
+                    onChange={(e) => setOrganizacion(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Nombre de tu empresa (sin espacios)</p>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="name">Nombre completo</Label>
                   <Input
                     id="name"
                     type="text"
                     placeholder="Juan Pérez"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={nombre}
+                    onChange={(e) => setNombre(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email">Correo</Label>
                   <Input
                     id="signup-email"
                     type="email"
                     placeholder="tu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={correo}
+                    onChange={(e) => setCorreo(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telefono">Teléfono</Label>
+                  <Input
+                    id="telefono"
+                    type="tel"
+                    placeholder="5551234567"
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="fecha-nacimiento">Fecha de nacimiento</Label>
+                  <Input
+                    id="fecha-nacimiento"
+                    type="date"
+                    value={fechaNacimiento}
+                    onChange={(e) => setFechaNacimiento(e.target.value)}
                     required
                   />
                 </div>
@@ -182,12 +233,12 @@ export default function Auth() {
                     id="signup-password"
                     type="password"
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    value={contraseña}
+                    onChange={(e) => setContraseña(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={8}
                   />
-                  <p className="text-xs text-muted-foreground">Mínimo 6 caracteres</p>
+                  <p className="text-xs text-muted-foreground">Mínimo 8 caracteres</p>
                 </div>
                 <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

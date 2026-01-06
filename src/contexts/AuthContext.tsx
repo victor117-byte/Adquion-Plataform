@@ -3,17 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 
 interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: 'user' | 'admin' | 'accountant';
+  id: number;
+  nombre: string;
+  correo: string;
+  telefono: string;
+  fecha_nacimiento: string;
+  tipo_usuario: 'administrador' | 'contador';
+  organizacion: string;
+  database: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  login: (organizacion: string, correo: string, contraseña: string) => Promise<void>;
+  register: (organizacion: string, nombre: string, correo: string, contraseña: string, telefono: string, fecha_nacimiento: string) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 }
@@ -58,28 +62,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   useEffect(() => {
-    // Verificar sesión con el backend
+    // Verificar sesión guardada localmente
     const checkSession = async () => {
-      const token = localStorage.getItem('auth_token');
+      const userData = localStorage.getItem('user_data');
       
-      if (token) {
+      if (userData) {
         try {
-          // Validar token con el backend
-          const response = await fetch(`${API_URL}/auth/me`, {
-            headers: getHeaders(true),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            setUser(data.user);
-          } else {
-            // Token inválido o expirado
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user_data');
-          }
+          const parsedUser = JSON.parse(userData);
+          setUser(parsedUser);
         } catch (error) {
-          console.error('Error validando sesión:', error);
-          localStorage.removeItem('auth_token');
+          console.error('Error al parsear datos de usuario:', error);
           localStorage.removeItem('user_data');
         }
       }
@@ -90,39 +82,67 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     checkSession();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (organizacion: string, correo: string, contraseña: string) => {
     try {
+      const payload = { organizacion, correo, contraseña };
+      console.log('📤 Enviando login:', payload);
+      console.log('🔗 URL:', `${API_URL}/auth/login`);
+      
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Credenciales inválidas');
+      console.log('📥 Respuesta status:', response.status);
+      console.log('📥 Respuesta headers:', response.headers.get('content-type'));
+      
+      // Verificar si hay contenido en la respuesta
+      const contentType = response.headers.get('content-type');
+      let data = null;
+      
+      if (response.status === 204 || !contentType || !contentType.includes('application/json')) {
+        // Respuesta sin contenido o no es JSON
+        console.log('⚠️ Respuesta sin contenido JSON');
+        if (!response.ok) {
+          throw new Error('Error al iniciar sesión: el servidor no devolvió datos');
+        }
+      } else {
+        const text = await response.text();
+        console.log('📥 Respuesta text:', text);
+        
+        if (text) {
+          data = JSON.parse(text);
+          console.log('📥 Respuesta data:', data);
+        }
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || 'Credenciales inválidas');
+      }
       
-      // Guardar token y datos de usuario
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user_data', JSON.stringify(data.user));
+      if (data && !data.success) {
+        throw new Error(data.message || 'Error al iniciar sesión');
+      }
       
-      setUser(data.user);
+      if (!data || !data.data) {
+        throw new Error('El servidor no devolvió los datos del usuario. Verifica que el backend esté funcionando correctamente.');
+      }
+      
+      // Guardar datos de usuario (el backend no devuelve token, solo datos)
+      localStorage.setItem('user_data', JSON.stringify(data.data));
+      
+      setUser(data.data);
       
       toast({
         title: "¡Bienvenido!",
-        description: `Has iniciado sesión como ${data.user.name}`,
+        description: `Has iniciado sesión como ${data.data.nombre}`,
       });
       
-      // Verificar si tiene suscripción activa
-      if (data.user.subscription?.status === 'active') {
-        navigate('/main');
-      } else {
-        navigate('/onboarding');
-      }
+      // Redirigir al dashboard principal
+      navigate('/main');
     } catch (error) {
+      console.error('❌ Error en login:', error);
       toast({
         title: "Error de autenticación",
         description: error instanceof Error ? error.message : "Error al iniciar sesión",
@@ -132,34 +152,67 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  const register = async (email: string, password: string, name: string) => {
+  const register = async (organizacion: string, nombre: string, correo: string, contraseña: string, telefono: string, fecha_nacimiento: string) => {
     try {
+      const payload = { organizacion, nombre, correo, contraseña, telefono, fecha_nacimiento };
+      console.log('📤 Enviando registro:', payload);
+      console.log('🔗 URL:', `${API_URL}/auth/register`);
+      
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Error al registrarse');
+      console.log('📥 Respuesta status:', response.status);
+      console.log('📥 Respuesta headers:', response.headers.get('content-type'));
+      
+      // Verificar si hay contenido en la respuesta
+      const contentType = response.headers.get('content-type');
+      let data = null;
+      
+      if (response.status === 204 || !contentType || !contentType.includes('application/json')) {
+        // Respuesta sin contenido o no es JSON
+        console.log('⚠️ Respuesta sin contenido JSON');
+        if (!response.ok) {
+          throw new Error('Error al registrarse: el servidor no devolvió datos');
+        }
+      } else {
+        const text = await response.text();
+        console.log('📥 Respuesta text:', text);
+        
+        if (text) {
+          data = JSON.parse(text);
+          console.log('📥 Respuesta data:', data);
+        }
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || 'Error al registrarse');
+      }
       
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user_data', JSON.stringify(data.user));
+      if (data && !data.success) {
+        throw new Error(data.message || 'Error al crear la cuenta');
+      }
       
-      setUser(data.user);
+      if (!data || !data.data) {
+        throw new Error('El servidor no devolvió los datos del usuario. Verifica que el backend esté funcionando correctamente.');
+      }
+      
+      // Guardar datos de usuario
+      localStorage.setItem('user_data', JSON.stringify(data.data));
+      
+      setUser(data.data);
       
       toast({
         title: "¡Cuenta creada exitosamente!",
-        description: `Bienvenido ${data.user.name}, ahora selecciona tu plan`,
+        description: `Bienvenido ${data.data.nombre}, tu organización ha sido creada`,
       });
       
-      // Redirigir al onboarding para selección de plan
-      navigate('/onboarding');
+      // Redirigir al dashboard principal
+      navigate('/main');
     } catch (error) {
+      console.error('❌ Error en registro:', error);
       toast({
         title: "Error de registro",
         description: error instanceof Error ? error.message : "Error al crear la cuenta",
@@ -170,7 +223,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const logout = async () => {
-    localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
     setUser(null);
     toast({
