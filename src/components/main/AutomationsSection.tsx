@@ -65,12 +65,10 @@ const getHeaders = () => ({
 
 // Opciones predefinidas de horarios (máximo 3 ejecuciones diarias)
 const HORARIOS_COMUNES = [
-  { label: 'Diario 2am', icon: Moon, cron: '0 2 * * *', desc: 'Una vez al día en la madrugada', veces: 1 },
-  { label: 'Diario 9am', icon: Sun, cron: '0 9 * * *', desc: 'Una vez al día en la mañana', veces: 1 },
-  { label: 'Diario 6pm', icon: Moon, cron: '0 18 * * *', desc: 'Una vez al día en la tarde', veces: 1 },
-  { label: 'Cada 8 horas', icon: Repeat, cron: '0 */8 * * *', desc: '3 veces al día (00:00, 08:00, 16:00)', veces: 3 },
+  { label: '8:00am y 4:30pm', icon: Sun, cron: '0 8,16 * * *', desc: 'Dos veces al día (mañana y tarde)', veces: 2 },
+  { label: '7:00am y 3:00pm', icon: Sun, cron: '0 7,15 * * *', desc: 'Dos veces al día (mañana y tarde)', veces: 2 },
+  { label: '9:00 pm', icon: Moon, cron: '0 21 * * *', desc: 'Una vez al día en la noche', veces: 1 },
   { label: 'Cada 12 horas', icon: Timer, cron: '0 */12 * * *', desc: '2 veces al día (medianoche y mediodía)', veces: 2 },
-  { label: 'Lunes 9am', icon: Calendar, cron: '0 9 * * 1', desc: 'Una vez por semana', veces: 1 },
 ];
 
 // Función para validar expresión cron (máximo 3 ejecuciones diarias)
@@ -101,13 +99,15 @@ const validarCron = (cron: string): { valido: boolean; mensaje: string } => {
 // Función para interpretar expresión cron
 const interpretarCron = (cron: string): string => {
   const ejemplos: Record<string, string> = {
+    '0 8,16 * * *': '8:00am y 4:30pm (2 veces al día)',
+    '0 7,15 * * *': '7:00am y 3:00pm (2 veces al día)',
+    '0 21 * * *': '9:00 PM (una vez al día)',
+    '0 */12 * * *': 'Cada 12 horas (2 veces al día)',
     '0 * * * *': 'Cada hora',
     '0 */8 * * *': 'Cada 8 horas (3 veces al día)',
-    '0 */12 * * *': 'Cada 12 horas (2 veces al día)',
     '0 2 * * *': 'Diario a las 2:00 AM',
     '0 9 * * *': 'Diario a las 9:00 AM',
     '0 18 * * *': 'Diario a las 6:00 PM',
-    '0 9 * * 1': 'Cada lunes a las 9:00 AM',
     '*/30 * * * *': 'Cada 30 minutos',
     '0 0 * * *': 'Diario a medianoche',
     '0 12 * * *': 'Diario a las 12:00 PM',
@@ -128,15 +128,19 @@ export function AutomationsSection() {
   const [automatizacionSeleccionada, setAutomatizacionSeleccionada] = useState<Automatizacion | null>(null);
 
   const [formConfig, setFormConfig] = useState({
-    cron_expresion: '0 2 * * *',
+    cron_expresion: '0 8,16 * * *',
     descripcion: '',
     cronMode: 'preset' as 'preset' | 'custom', // Modo selector visual o manual
+    customHour: '09',
+    customMinute: '00',
   });
 
   const [formEdit, setFormEdit] = useState({
     descripcion: '',
     cron_expresion: '',
     cronMode: 'preset' as 'preset' | 'custom',
+    customHour: '09',
+    customMinute: '00',
   });
 
   const isAdmin = currentUser?.tipo_usuario === 'administrador';
@@ -227,9 +231,11 @@ export function AutomationsSection() {
   const abrirDialogConfig = (script: ScriptDisponible) => {
     setScriptSeleccionado(script);
     setFormConfig({
-      cron_expresion: '0 2 * * *',
+      cron_expresion: '0 8,16 * * *',
       descripcion: script.descripcion_sugerida,
       cronMode: 'preset',
+      customHour: '09',
+      customMinute: '00',
     });
     setDialogConfigOpen(true);
   };
@@ -362,10 +368,16 @@ export function AutomationsSection() {
 
   const abrirDialogEdit = (auto: Automatizacion) => {
     setAutomatizacionSeleccionada(auto);
+    // Extraer hora y minuto del cron si es posible
+    const cronParts = auto.cron_expresion.split(' ');
+    const minute = cronParts[0] || '00';
+    const hour = cronParts[1] || '09';
     setFormEdit({
       descripcion: auto.descripcion,
       cron_expresion: auto.cron_expresion,
       cronMode: 'preset',
+      customHour: hour,
+      customMinute: minute,
     });
     setDialogEditOpen(true);
   };
@@ -374,9 +386,11 @@ export function AutomationsSection() {
     setDialogConfigOpen(false);
     setScriptSeleccionado(null);
     setFormConfig({
-      cron_expresion: '0 2 * * *',
+      cron_expresion: '0 8,16 * * *',
       descripcion: '',
       cronMode: 'preset',
+      customHour: '09',
+      customMinute: '00',
     });
   };
 
@@ -808,7 +822,7 @@ export function AutomationsSection() {
                       <div className="flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
-                          Máximo 3 ejecuciones por día para proteger el backend
+                          Máximo 3 ejecuciones por día
                         </p>
                       </div>
                     </div>
@@ -859,69 +873,79 @@ export function AutomationsSection() {
                   </div>
                 )}
 
-                {/* Input manual */}
+                {/* Input manual con time picker */}
                 {formConfig.cronMode === 'custom' && (
                   <div className="space-y-3">
-                    <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-3">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                       <div className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                        <div className="text-sm text-red-900 dark:text-red-200">
-                          <p className="font-medium">⚠️ Restricciones de seguridad</p>
-                          <ul className="text-xs mt-1 space-y-0.5">
-                            <li>• Máximo 3 ejecuciones por día</li>
-                            <li>• Intervalo mínimo de 3 horas entre ejecuciones</li>
-                            <li>• No se permiten intervalos de minutos</li>
-                          </ul>
+                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
+                          Máximo 3 ejecuciones por día
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Time Picker */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Selecciona la hora
+                      </Label>
+                      <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground mb-1.5 block">Hora</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="23"
+                            value={formConfig.customHour}
+                            onChange={(e) => {
+                              const hour = e.target.value.padStart(2, '0');
+                              setFormConfig({ 
+                                ...formConfig, 
+                                customHour: hour,
+                                cron_expresion: `0 ${hour} * * *`
+                              });
+                            }}
+                            className="text-center text-2xl font-bold h-16"
+                          />
+                        </div>
+                        <div className="text-3xl font-bold text-muted-foreground">:</div>
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground mb-1.5 block">Minuto</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="59"
+                            value={formConfig.customMinute}
+                            onChange={(e) => {
+                              const minute = e.target.value.padStart(2, '0');
+                              setFormConfig({ 
+                                ...formConfig, 
+                                customMinute: minute,
+                                cron_expresion: `${minute} ${formConfig.customHour} * * *`
+                              });
+                            }}
+                            className="text-center text-2xl font-bold h-16"
+                          />
                         </div>
                       </div>
                     </div>
-                    <div className="relative">
-                      <Input
-                        value={formConfig.cron_expresion}
-                        onChange={(e) => setFormConfig({ ...formConfig, cron_expresion: e.target.value })}
-                        placeholder="0 9 * * *"
-                        className={`text-base h-12 font-mono pr-10 ${
-                          formConfig.cron_expresion && !validarCron(formConfig.cron_expresion).valido
-                            ? 'border-red-500 focus-visible:ring-red-500'
-                            : 'border-green-500 focus-visible:ring-green-500'
-                        }`}
-                      />
-                      {formConfig.cron_expresion && (
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          {validarCron(formConfig.cron_expresion).valido ? (
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                          ) : (
-                            <XCircle className="h-5 w-5 text-red-500" />
-                          )}
+
+                    {/* Preview */}
+                    <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                         </div>
-                      )}
-                    </div>
-                    {formConfig.cron_expresion && !validarCron(formConfig.cron_expresion).valido && (
-                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                        <p className="text-xs text-red-700 dark:text-red-300 font-medium">
-                          {validarCron(formConfig.cron_expresion).mensaje}
-                        </p>
-                      </div>
-                    )}
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-blue-600" />
-                        <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-                          Formato: minuto hora día mes día-semana
-                        </p>
-                      </div>
-                      <div className="space-y-1 text-xs text-blue-800 dark:text-blue-300">
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-600" />
-                          <code className="bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded">0 2 * * *</code> = Diario a las 2:00 AM
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle className="h-3 w-3 text-green-600" />
-                          <code className="bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded">0 */8 * * *</code> = Cada 8 horas (3x día)
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <XCircle className="h-3 w-3 text-red-600" />
-                          <code className="bg-blue-100 dark:bg-blue-900 px-2 py-0.5 rounded">*/30 * * * *</code> = Cada 30 min (bloqueado)
+                        <div>
+                          <p className="text-xs text-green-700 dark:text-green-300 font-medium">Se ejecutará:</p>
+                          <p className="text-base font-bold text-green-900 dark:text-green-100">
+                            Diario a las {formConfig.customHour}:{formConfig.customMinute}
+                          </p>
+                          <code className="text-[10px] bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded mt-1 inline-block">
+                            {formConfig.cron_expresion}
+                          </code>
                         </div>
                       </div>
                     </div>
@@ -1042,7 +1066,7 @@ export function AutomationsSection() {
 
       {/* Dialog Editar */}
       <Dialog open={dialogEditOpen} onOpenChange={setDialogEditOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl">Editar Automatización</DialogTitle>
           </DialogHeader>
@@ -1058,24 +1082,195 @@ export function AutomationsSection() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit-descripcion" className="text-base">Descripción</Label>
+                <Label htmlFor="edit-descripcion" className="text-base font-semibold">Descripción</Label>
                 <Textarea
                   id="edit-descripcion"
                   value={formEdit.descripcion}
                   onChange={(e) => setFormEdit({ ...formEdit, descripcion: e.target.value })}
-                  rows={4}
+                  rows={3}
                   className="text-base resize-none"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-cron" className="text-base">Expresión Cron</Label>
-                <Input
-                  id="edit-cron"
-                  value={formEdit.cron_expresion}
-                  onChange={(e) => setFormEdit({ ...formEdit, cron_expresion: e.target.value })}
-                  className="text-base h-12"
-                />
+              {/* Selector de horario para edición */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  ¿Cuándo ejecutar?
+                </Label>
+                
+                <div className="flex gap-2 p-1 bg-muted rounded-lg">
+                  <Button
+                    type="button"
+                    variant={formEdit.cronMode === 'preset' ? 'default' : 'ghost'}
+                    className="flex-1 h-10"
+                    onClick={() => setFormEdit({ ...formEdit, cronMode: 'preset' })}
+                  >
+                    <Zap className="h-4 w-4 mr-2" />
+                    Horarios Comunes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formEdit.cronMode === 'custom' ? 'default' : 'ghost'}
+                    className="flex-1 h-10"
+                    onClick={() => setFormEdit({ ...formEdit, cronMode: 'custom' })}
+                  >
+                    <Settings2 className="h-4 w-4 mr-2" />
+                    Personalizado
+                  </Button>
+                </div>
+
+                {/* Selector visual */}
+                {formEdit.cronMode === 'preset' && (
+                  <div className="space-y-3">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
+                          Máximo 3 ejecuciones por día
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {HORARIOS_COMUNES.map((horario) => {
+                        const IconComponent = horario.icon;
+                        const isSelected = formEdit.cron_expresion === horario.cron;
+                        return (
+                          <Card
+                            key={horario.cron}
+                            className={`p-4 cursor-pointer transition-all hover:shadow-lg active:scale-95 ${
+                              isSelected 
+                                ? 'border-2 border-primary bg-primary/5 shadow-md' 
+                                : 'border hover:border-primary/50'
+                            }`}
+                            onClick={() => setFormEdit({ ...formEdit, cron_expresion: horario.cron })}
+                          >
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                <IconComponent className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <h5 className="font-semibold text-sm">{horario.label}</h5>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-[10px] px-1.5 py-0 ${
+                                      horario.veces === 1 
+                                        ? 'border-green-300 text-green-700 dark:text-green-400' 
+                                        : horario.veces === 2 
+                                        ? 'border-blue-300 text-blue-700 dark:text-blue-400'
+                                        : 'border-yellow-300 text-yellow-700 dark:text-yellow-400'
+                                    }`}
+                                  >
+                                    {horario.veces}x/día
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground truncate">{horario.desc}</p>
+                              </div>
+                            </div>
+                            <code className="text-[10px] bg-muted px-2 py-1 rounded block text-center">
+                              {horario.cron}
+                            </code>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Time Picker */}
+                {formEdit.cronMode === 'custom' && (
+                  <div className="space-y-3">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
+                          Máximo 3 ejecuciones por día
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Selecciona la hora
+                      </Label>
+                      <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground mb-1.5 block">Hora</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="23"
+                            value={formEdit.customHour}
+                            onChange={(e) => {
+                              const hour = e.target.value.padStart(2, '0');
+                              setFormEdit({ 
+                                ...formEdit, 
+                                customHour: hour,
+                                cron_expresion: `0 ${hour} * * *`
+                              });
+                            }}
+                            className="text-center text-2xl font-bold h-16"
+                          />
+                        </div>
+                        <div className="text-3xl font-bold text-muted-foreground">:</div>
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground mb-1.5 block">Minuto</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="59"
+                            value={formEdit.customMinute}
+                            onChange={(e) => {
+                              const minute = e.target.value.padStart(2, '0');
+                              setFormEdit({ 
+                                ...formEdit, 
+                                customMinute: minute,
+                                cron_expresion: `${minute} ${formEdit.customHour} * * *`
+                              });
+                            }}
+                            className="text-center text-2xl font-bold h-16"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-green-700 dark:text-green-300 font-medium">Se ejecutará:</p>
+                          <p className="text-base font-bold text-green-900 dark:text-green-100">
+                            Diario a las {formEdit.customHour}:{formEdit.customMinute}
+                          </p>
+                          <code className="text-[10px] bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded mt-1 inline-block">
+                            {formEdit.cron_expresion}
+                          </code>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview de interpretación */}
+                {formEdit.cronMode === 'preset' && (
+                  <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-green-700 dark:text-green-300 font-medium">Se ejecutará:</p>
+                        <p className="text-base font-bold text-green-900 dark:text-green-100">
+                          {interpretarCron(formEdit.cron_expresion)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
