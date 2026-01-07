@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
-import { fetchWithFallback, getCommonHeaders } from '@/lib/api';
 
 interface User {
   id: number;
@@ -42,6 +41,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
+  // CONFIGURACIÓN DEL BACKEND
+  const API_URL = import.meta.env.VITE_API_URL || '/api';
+
+  // Headers comunes para todas las peticiones (incluye bypass de ngrok)
+  const getHeaders = (includeAuth = false) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
+    };
+    
+    if (includeAuth) {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+    
+    return headers;
+  };
+
   useEffect(() => {
     // Verificar sesión guardada localmente
     const checkSession = async () => {
@@ -67,10 +86,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const payload = { organizacion, correo, contraseña };
       console.log('📤 Enviando login:', payload);
+      console.log('🔗 URL:', `${API_URL}/auth/login`);
       
-      const response = await fetchWithFallback('/auth/login', {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
-        headers: getCommonHeaders(),
+        headers: getHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -136,10 +156,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       const payload = { organizacion, nombre, correo, contraseña, telefono, fecha_nacimiento };
       console.log('📤 Enviando registro:', payload);
+      console.log('🔗 URL:', `${API_URL}/auth/register`);
       
-      const response = await fetchWithFallback('/auth/register', {
+      const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',
-        headers: getCommonHeaders(),
+        headers: getHeaders(),
         body: JSON.stringify(payload),
       });
 
@@ -213,9 +234,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const resetPassword = async (email: string) => {
     try {
-      const response = await fetchWithFallback('/auth/reset-password', {
+      const response = await fetch(`${API_URL}/auth/reset-password`, {
         method: 'POST',
-        headers: getCommonHeaders(),
+        headers: getHeaders(),
         body: JSON.stringify({ email }),
       });
 
