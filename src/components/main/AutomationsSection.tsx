@@ -30,6 +30,7 @@ interface ScriptDisponible {
   nombre_display: string;
   descripcion_sugerida: string;
   configurado: boolean;
+  es_especifico_org?: boolean;
 }
 
 interface Automatizacion {
@@ -672,9 +673,17 @@ export function AutomationsSection() {
                   <div className="p-3 bg-primary/10 rounded-xl">
                     <FileCode className="h-6 w-6 md:h-7 md:w-7 text-primary" />
                   </div>
-                  <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                    Nuevo
-                  </Badge>
+                  <div className="flex flex-col gap-1.5">
+                    <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                      Nuevo
+                    </Badge>
+                    {script.es_especifico_org && (
+                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-[10px]">
+                        <Zap className="h-3 w-3 mr-1" />
+                        Exclusivo
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <h4 className="font-semibold text-base md:text-lg mb-2 capitalize">
                   {script.nombre_display}
