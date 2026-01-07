@@ -24,13 +24,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
+/**
+ * 🎯 SISTEMA DE AUTOMATIZACIONES:
+ * 
+ * ARCHIVOS FÍSICOS (en backend):
+ *   - <nombre>.py → Script GENERAL (todas las organizaciones)
+ *     Ejemplo: sincronizacion_sat.py
+ *   
+ *   - <org>_<nombre>.py → Script ESPECÍFICO (solo esa organización)
+ *     Ejemplo: org_1_proceso.py, local_proceso.py
+ * 
+ * NOMBRE EN BASE DE DATOS:
+ *   El backend requiere que el campo "nombre" tenga prefijo "prod_"
+ *   El frontend automáticamente agrega este prefijo al configurar.
+ *   Ejemplo: sincronizacion_sat.py → nombre: "prod_sincronizacion_sat"
+ * 
+ * El backend determina es_especifico_org basándose en si el nombre del archivo
+ * comienza con el nombre de la organización (en minúsculas con guiones bajos).
+ */
+
 interface ScriptDisponible {
   script_path: string;
   nombre_sugerido: string;
   nombre_display: string;
   descripcion_sugerida: string;
   configurado: boolean;
-  es_especifico_org?: boolean;
+  es_especifico_org?: boolean; // true = específico, false/undefined = general
 }
 
 interface Automatizacion {
@@ -160,20 +179,28 @@ export function AutomationsSection() {
 
   const cargarScriptsDisponibles = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) return;
+      if (!currentUser?.correo || !currentUser?.organizacion) {
+        console.log('⚠️ No hay usuario o organización:', { correo: currentUser?.correo, org: currentUser?.organizacion });
+        return;
+      }
 
-      const response = await fetch(
-        `${API_URL}/automatizaciones/disponibles?correo=${encodeURIComponent(currentUser.correo)}&organizacion=${encodeURIComponent(currentUser.organizacion)}`,
-        {
-          method: 'GET',
-          headers: getHeaders()
-        }
-      );
+      const url = `${API_URL}/automatizaciones/disponibles?organizacion=${encodeURIComponent(currentUser.organizacion)}&correo=${encodeURIComponent(currentUser.correo)}`;
+      console.log('📤 Solicitando scripts:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: getHeaders()
+      });
       
       const result = await response.json();
+      console.log('📥 Respuesta scripts:', result);
       
       if (result.success) {
-        setScriptsDisponibles(result.data.scripts_disponibles || []);
+        const scripts = result.data.scripts_disponibles || [];
+        console.log('✅ Scripts disponibles:', scripts.length, scripts);
+        setScriptsDisponibles(scripts);
+      } else {
+        console.error('❌ Error en respuesta:', result.message);
       }
     } catch (error) {
       console.error('❌ Error cargando scripts disponibles:', error);
@@ -182,20 +209,26 @@ export function AutomationsSection() {
 
   const cargarAutomatizaciones = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) return;
+      if (!currentUser?.correo || !currentUser?.organizacion) {
+        console.log('⚠️ No hay usuario para cargar automatizaciones');
+        return;
+      }
 
-      const response = await fetch(
-        `${API_URL}/automatizaciones?correo=${encodeURIComponent(currentUser.correo)}&organizacion=${encodeURIComponent(currentUser.organizacion)}`,
-        {
-          method: 'GET',
-          headers: getHeaders()
-        }
-      );
+      const url = `${API_URL}/automatizaciones?organizacion=${encodeURIComponent(currentUser.organizacion)}&correo=${encodeURIComponent(currentUser.correo)}`;
+      console.log('📤 Solicitando automatizaciones:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: getHeaders()
+      });
       
       const result = await response.json();
+      console.log('📥 Respuesta automatizaciones:', result);
       
       if (result.success) {
-        setAutomatizaciones(result.data.automatizaciones || []);
+        const autos = result.data.automatizaciones || [];
+        console.log('✅ Automatizaciones configuradas:', autos.length);
+        setAutomatizaciones(autos);
       }
     } catch (error) {
       console.error('❌ Error cargando automatizaciones:', error);
@@ -209,13 +242,12 @@ export function AutomationsSection() {
 
   const cargarLogs = async (idAutomatizacion: number) => {
     try {
-      const response = await fetch(
-        `${API_URL}/automatizaciones/logs?correo=${encodeURIComponent(currentUser?.correo || '')}&organizacion=${encodeURIComponent(currentUser?.organizacion || '')}&id_automatizacion=${idAutomatizacion}`,
-        {
-          method: 'GET',
-          headers: getHeaders()
-        }
-      );
+      const url = `${API_URL}/automatizaciones/logs?organizacion=${encodeURIComponent(currentUser?.organizacion || '')}&correo=${encodeURIComponent(currentUser?.correo || '')}&id_automatizacion=${idAutomatizacion}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: getHeaders()
+      });
       
       const result = await response.json();
       
@@ -260,10 +292,14 @@ export function AutomationsSection() {
     }
 
     try {
+      // Asegurar que el nombre tenga el prefijo prod_
+      const nombreBase = scriptSeleccionado.script_path.replace('.py', '');
+      const nombreConPrefijo = nombreBase.startsWith('prod_') ? nombreBase : `prod_${nombreBase}`;
+      
       const payload = {
         correo_admin: currentUser?.correo,
         organizacion: currentUser?.organizacion,
-        nombre: scriptSeleccionado.nombre_sugerido,
+        nombre: nombreConPrefijo, // Nombre con prefijo prod_ garantizado
         descripcion: formConfig.descripcion,
         script_path: scriptSeleccionado.script_path,
         cron_expresion: formConfig.cron_expresion,
@@ -673,17 +709,12 @@ export function AutomationsSection() {
                   <div className="p-3 bg-primary/10 rounded-xl">
                     <FileCode className="h-6 w-6 md:h-7 md:w-7 text-primary" />
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                      Nuevo
+                  {script.es_especifico_org && (
+                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs">
+                      <Zap className="h-3 w-3 mr-1" />
+                      Exclusivo
                     </Badge>
-                    {script.es_especifico_org && (
-                      <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-[10px]">
-                        <Zap className="h-3 w-3 mr-1" />
-                        Exclusivo
-                      </Badge>
-                    )}
-                  </div>
+                  )}
                 </div>
                 <h4 className="font-semibold text-base md:text-lg mb-2 capitalize">
                   {script.nombre_display}
@@ -928,11 +959,11 @@ export function AutomationsSection() {
             <div className="space-y-5 py-2">
               {/* Info del script */}
               <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-4 border-2 border-primary/20">
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-3">
                   <div className="p-2.5 bg-primary/20 rounded-lg">
                     <FileCode className="h-6 w-6 text-primary" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h4 className="font-bold text-lg capitalize">{scriptSeleccionado.nombre_display}</h4>
                     <code className="text-xs bg-background/50 px-2 py-1 rounded border">
                       {scriptSeleccionado.script_path}

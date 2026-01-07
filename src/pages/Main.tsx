@@ -230,6 +230,10 @@ export default function Main() {
               <Badge className="mt-1" variant={user.tipo_usuario === 'administrador' ? 'default' : 'secondary'}>
                 {user.tipo_usuario}
               </Badge>
+              <div className="mt-2 pt-2 border-t border-border">
+                <p className="text-xs text-muted-foreground">Organización:</p>
+                <p className="text-sm font-medium truncate">{user.organizacion}</p>
+              </div>
             </div>
           )}
           <Button 

@@ -21,9 +21,14 @@ export const Header = () => {
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              <span className="text-sm text-muted-foreground hidden md:inline">
-                {user.name}
-              </span>
+              <div className="flex flex-col items-end">
+                <span className="text-sm font-medium">
+                  {user.nombre}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {user.organizacion}
+                </span>
+              </div>
               <Button variant="ghost" size="sm" onClick={logout}>
                 Cerrar Sesión
               </Button>
