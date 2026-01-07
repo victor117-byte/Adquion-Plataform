@@ -2,12 +2,12 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <script>
+    // GitHub Pages SPA redirect workaround
+    sessionStorage.redirect = location.href;
+  </script>
   <meta http-equiv="refresh" content="0;url=/fiscal-nexus-pro/">
 </head>
 <body>
-  <script>
-    const path = window.location.pathname.replace('/fiscal-nexus-pro', '');
-    window.location.replace('/fiscal-nexus-pro/' + (path === '/' ? '' : path.slice(1)) + window.location.search + window.location.hash);
-  </script>
 </body>
 </html>
