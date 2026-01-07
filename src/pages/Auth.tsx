@@ -44,7 +44,10 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
+      console.log('📝 Datos del formulario:', { organizacion, nombre, correo, telefono, fechaNacimiento });
       await register(organizacion, nombre, correo, contraseña, telefono, fechaNacimiento);
+    } catch (error) {
+      console.error('❌ Error en handleSignup:', error);
     } finally {
       setLoading(false);
     }

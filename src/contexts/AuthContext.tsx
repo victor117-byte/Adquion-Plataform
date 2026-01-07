@@ -162,6 +162,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(payload),
+      }).catch(err => {
+        console.error('❌ Error de red:', err);
+        throw new Error('No se pudo conectar al servidor. Verifica tu conexión o que el backend esté activo.');
       });
 
       console.log('📥 Respuesta status:', response.status);
