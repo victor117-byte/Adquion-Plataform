@@ -1,55 +1,80 @@
-import { useState, useEffect } from "react";
-import { Play, Calendar, CheckCircle, XCircle, Clock, Edit, Trash2, Settings2, FileCode, TrendingUp, Sun, Moon, Timer, Repeat, Zap, AlertCircle } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Play, Calendar, CheckCircle, XCircle, Clock, Edit, Trash2,
+  Settings2, FileCode, TrendingUp, Sun, Moon, Timer, Zap,
+  AlertCircle, Loader2, StopCircle, Info, Database, Upload,
+  ListChecks, Variable, Plus, X, Eye, ArrowRight, RefreshCw,
+  ChevronRight, RotateCcw, Lightbulb, MessageSquare, Activity,
+  Circle, ArrowDown, PlayCircle, PauseCircle, History, Cpu
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
-/**
- * 🎯 SISTEMA DE AUTOMATIZACIONES:
- * 
- * ARCHIVOS FÍSICOS (en backend):
- *   - <nombre>.py → Script GENERAL (todas las organizaciones)
- *     Ejemplo: sincronizacion_sat.py
- *   
- *   - <org>_<nombre>.py → Script ESPECÍFICO (solo esa organización)
- *     Ejemplo: org_1_proceso.py, local_proceso.py
- * 
- * NOMBRE EN BASE DE DATOS:
- *   El backend requiere que el campo "nombre" tenga prefijo "prod_"
- *   El frontend automáticamente agrega este prefijo al configurar.
- *   Ejemplo: sincronizacion_sat.py → nombre: "prod_sincronizacion_sat"
- * 
- * El backend determina es_especifico_org basándose en si el nombre del archivo
- * comienza con el nombre de la organización (en minúsculas con guiones bajos).
- */
+// ==================== INTERFACES ====================
+
+type PhaseStatus = 'pending' | 'running' | 'completed' | 'error';
+
+interface ScriptFase {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  peso: number;
+}
+
+interface ScriptVariable {
+  nombre: string;
+  descripcion: string;
+  requerida: boolean;
+  default?: string;
+  tipo?: 'texto' | 'fecha' | 'numero' | 'opcion';
+  opciones?: string[];
+}
+
+interface ScriptMetadata {
+  nombre: string;
+  descripcion: string;
+  version?: string;
+  autor?: string;
+  fases?: ScriptFase[];
+  variables_requeridas?: ScriptVariable[];
+}
 
 interface ScriptDisponible {
   script_path: string;
   nombre_sugerido: string;
   nombre_display: string;
-  descripcion_sugerida: string;
+  descripcion_sugerida?: string;
   configurado: boolean;
-  es_especifico_org?: boolean; // true = específico, false/undefined = general
+  es_especifico_org?: boolean;
+  tiene_metadata?: boolean;
+  metadata?: ScriptMetadata;
 }
 
 interface Automatizacion {
@@ -68,6 +93,43 @@ interface Automatizacion {
   variables_personalizadas?: Record<string, string | number | boolean>;
 }
 
+interface PhaseState {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+  status: PhaseStatus;
+  progress?: number;
+  started_at?: string;
+  completed_at?: string;
+  logs?: { timestamp: string; level: string; message: string }[];
+}
+
+interface ExecutionStatus {
+  execution_id: string;
+  organizacion: string;
+  started_at: string;
+  updated_at: string;
+  status: 'running' | 'completed' | 'error';
+  current_phase: {
+    id: string;
+    nombre: string;
+    descripcion?: string;
+    started_at: string;
+  } | null;
+  progress: {
+    percentage: number;
+    items_processed: number;
+    items_total: number;
+  };
+  phases_completed: string[];
+  messages: {
+    timestamp: string;
+    level: 'info' | 'warning' | 'error';
+    message: string;
+  }[];
+  error: string | null;
+}
+
 interface LogEjecucion {
   id: number;
   estado: 'exitoso' | 'error';
@@ -78,63 +140,1021 @@ interface LogEjecucion {
   error_mensaje: string | null;
 }
 
+// ==================== CONSTANTES ====================
+
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const getHeaders = () => ({
   'Content-Type': 'application/json',
 });
 
-// Opciones predefinidas de horarios (máximo 3 ejecuciones diarias)
-const HORARIOS_COMUNES = [
-  { label: '8:00am y 4:30pm', icon: Sun, cron: '0 8,16 * * *', desc: 'Dos veces al día (mañana y tarde)', veces: 2 },
-  { label: '7:00am y 3:00pm', icon: Sun, cron: '0 7,15 * * *', desc: 'Dos veces al día (mañana y tarde)', veces: 2 },
-  { label: '9:00 pm', icon: Moon, cron: '0 21 * * *', desc: 'Una vez al día en la noche', veces: 1 },
-  { label: 'Cada 12 horas', icon: Timer, cron: '0 */12 * * *', desc: '2 veces al día (medianoche y mediodía)', veces: 2 },
+// Modos de programación
+type ScheduleMode = 'manual' | 'hourly' | 'daily' | 'weekly' | 'cron';
+
+const SCHEDULE_OPTIONS = [
+  { value: 'manual', label: 'Manual', desc: 'Solo cuando yo lo ejecute', icon: PlayCircle },
+  { value: 'hourly', label: 'Cada X horas', desc: 'Repetir cada cierto número de horas', icon: RefreshCw },
+  { value: 'daily', label: 'Diario', desc: 'Una vez al día a una hora específica', icon: Sun },
+  { value: 'weekly', label: 'Semanal', desc: 'Ciertos días de la semana', icon: Calendar },
+  { value: 'cron', label: 'Avanzado', desc: 'Expresión cron personalizada', icon: Settings2 },
 ];
 
-// Función para validar expresión cron (máximo 3 ejecuciones diarias)
-const validarCron = (cron: string): { valido: boolean; mensaje: string } => {
-  // Patrones peligrosos que se ejecutan muy frecuentemente
-  const patronesProhibidos = [
-    { regex: /^\*\/([1-9]|[1-5][0-9]) \* \* \* \*$/, mensaje: 'No se permiten intervalos menores a 1 hora' },
-    { regex: /^\* \* \* \* \*$/, mensaje: 'No se permite ejecución cada minuto' },
-    { regex: /^0 \*\/[1-2] \* \* \*$/, mensaje: 'Intervalos de 1-2 horas exceden el límite de 3 ejecuciones diarias' },
-  ];
+const WEEKDAYS = [
+  { value: '1', label: 'Lun' },
+  { value: '2', label: 'Mar' },
+  { value: '3', label: 'Mié' },
+  { value: '4', label: 'Jue' },
+  { value: '5', label: 'Vie' },
+  { value: '6', label: 'Sáb' },
+  { value: '0', label: 'Dom' },
+];
 
-  for (const patron of patronesProhibidos) {
-    if (patron.regex.test(cron)) {
-      return { valido: false, mensaje: patron.mensaje };
+// Diccionario de errores técnicos a mensajes amigables
+const ERROR_TRANSLATIONS: Record<string, { message: string; recommendation: string }> = {
+  'connection refused': {
+    message: 'No se pudo conectar con el servidor de datos',
+    recommendation: 'Verifica que el servicio esté disponible o contacta al administrador'
+  },
+  'timeout': {
+    message: 'La operación tardó demasiado tiempo',
+    recommendation: 'Intenta de nuevo en unos minutos o reduce el volumen de datos'
+  },
+  'authentication failed': {
+    message: 'Error de autenticación',
+    recommendation: 'Verifica que las credenciales configuradas sean correctas'
+  },
+  'permission denied': {
+    message: 'No tienes permisos para realizar esta operación',
+    recommendation: 'Contacta al administrador para solicitar acceso'
+  },
+  'file not found': {
+    message: 'No se encontró el archivo solicitado',
+    recommendation: 'Verifica que el archivo exista en la ubicación especificada'
+  },
+  'invalid data': {
+    message: 'Los datos recibidos tienen un formato incorrecto',
+    recommendation: 'Revisa que los datos de origen estén en el formato esperado'
+  },
+  'rate limit': {
+    message: 'Se excedió el límite de solicitudes',
+    recommendation: 'Espera unos minutos antes de ejecutar de nuevo'
+  },
+  'out of memory': {
+    message: 'La operación requiere más recursos de los disponibles',
+    recommendation: 'Intenta procesar menos datos o contacta al administrador'
+  },
+  'network error': {
+    message: 'Error de conexión a internet',
+    recommendation: 'Verifica tu conexión a internet e intenta de nuevo'
+  },
+  'sat_error': {
+    message: 'Error al comunicarse con el SAT',
+    recommendation: 'El portal del SAT puede estar en mantenimiento. Intenta más tarde'
+  },
+  'database error': {
+    message: 'Error al acceder a la base de datos',
+    recommendation: 'El sistema se recuperará automáticamente. Si persiste, contacta soporte'
+  },
+};
+
+// ==================== UTILIDADES ====================
+
+const translateError = (technicalError: string): { message: string; recommendation: string } => {
+  const errorLower = technicalError.toLowerCase();
+
+  for (const [key, translation] of Object.entries(ERROR_TRANSLATIONS)) {
+    if (errorLower.includes(key)) {
+      return translation;
     }
   }
 
-  // Validar formato básico
+  return {
+    message: 'Ocurrió un error durante la ejecución',
+    recommendation: 'Si el problema persiste, contacta al equipo de soporte técnico'
+  };
+};
+
+const validarCron = (cron: string): { valido: boolean; mensaje: string } => {
   const partes = cron.trim().split(' ');
   if (partes.length !== 5) {
-    return { valido: false, mensaje: 'Formato inválido. Debe tener 5 campos: minuto hora día mes día-semana' };
+    return { valido: false, mensaje: 'Formato inválido. Debe tener 5 campos.' };
+  }
+  return { valido: true, mensaje: 'Válido' };
+};
+
+const interpretarCron = (cron: string): string => {
+  if (cron === 'manual') return 'Ejecución manual';
+
+  const ejemplos: Record<string, string> = {
+    '0 8,16 * * *': 'Diario a las 8:00am y 4:00pm',
+    '0 7,15 * * *': 'Diario a las 7:00am y 3:00pm',
+    '0 21 * * *': 'Diario a las 9:00pm',
+    '0 */12 * * *': 'Cada 12 horas',
+    '0 * * * *': 'Cada hora',
+    '0 */8 * * *': 'Cada 8 horas',
+    '0 2 * * *': 'Diario a las 2:00am',
+    '0 9 * * *': 'Diario a las 9:00am',
+    '0 18 * * *': 'Diario a las 6:00pm',
+    '0 0 * * *': 'Diario a medianoche',
+    '0 12 * * *': 'Diario a las 12:00pm',
+  };
+
+  if (ejemplos[cron]) return ejemplos[cron];
+
+  // Intentar interpretar cron básico
+  const parts = cron.split(' ');
+  if (parts.length === 5) {
+    const [min, hour, , , dayOfWeek] = parts;
+
+    if (dayOfWeek !== '*') {
+      const days = dayOfWeek.split(',').map(d => WEEKDAYS.find(w => w.value === d)?.label).filter(Boolean);
+      return `${days.join(', ')} a las ${hour}:${min.padStart(2, '0')}`;
+    }
+
+    if (hour.includes('/')) {
+      const interval = hour.split('/')[1];
+      return `Cada ${interval} horas`;
+    }
+
+    if (hour.includes(',')) {
+      const hours = hour.split(',').map(h => `${h}:00`);
+      return `Diario a las ${hours.join(' y ')}`;
+    }
+
+    return `Diario a las ${hour}:${min.padStart(2, '0')}`;
   }
 
-  // Si pasa las validaciones
-  return { valido: true, mensaje: 'Expresión válida' };
+  return 'Programación personalizada';
 };
 
-// Función para interpretar expresión cron
-const interpretarCron = (cron: string): string => {
-  const ejemplos: Record<string, string> = {
-    '0 8,16 * * *': '8:00am y 4:30pm (2 veces al día)',
-    '0 7,15 * * *': '7:00am y 3:00pm (2 veces al día)',
-    '0 21 * * *': '9:00 PM (una vez al día)',
-    '0 */12 * * *': 'Cada 12 horas (2 veces al día)',
-    '0 * * * *': 'Cada hora',
-    '0 */8 * * *': 'Cada 8 horas (3 veces al día)',
-    '0 2 * * *': 'Diario a las 2:00 AM',
-    '0 9 * * *': 'Diario a las 9:00 AM',
-    '0 18 * * *': 'Diario a las 6:00 PM',
-    '*/30 * * * *': 'Cada 30 minutos',
-    '0 0 * * *': 'Diario a medianoche',
-    '0 12 * * *': 'Diario a las 12:00 PM',
-  };
-  return ejemplos[cron] || 'Horario personalizado';
+const generateCronFromSchedule = (
+  mode: ScheduleMode,
+  config: {
+    hour?: string;
+    minute?: string;
+    interval?: string;
+    weekdays?: string[];
+  }
+): string => {
+  const { hour = '9', minute = '0', interval = '8', weekdays = [] } = config;
+
+  switch (mode) {
+    case 'manual':
+      return 'manual';
+    case 'hourly':
+      return `0 */${interval} * * *`;
+    case 'daily':
+      return `${minute} ${hour} * * *`;
+    case 'weekly':
+      return `${minute} ${hour} * * ${weekdays.join(',')}`;
+    default:
+      return `${minute} ${hour} * * *`;
+  }
 };
+
+// ==================== COMPONENTES DE UI ====================
+
+// Icono de fase según tipo
+const getPhaseIcon = (phaseId: string) => {
+  const id = phaseId.toLowerCase();
+  if (id.includes('inicio') || id.includes('init')) return PlayCircle;
+  if (id.includes('extrac')) return Database;
+  if (id.includes('transfor')) return RefreshCw;
+  if (id.includes('carga') || id.includes('load')) return Upload;
+  if (id.includes('fin') || id.includes('end')) return CheckCircle;
+  return Circle;
+};
+
+// Nodo visual de fase (sin interactividad)
+function PhaseNode({
+  phase,
+  status,
+  progress,
+  isLast,
+}: {
+  phase: ScriptFase;
+  status: PhaseStatus;
+  progress?: number;
+  isLast: boolean;
+}) {
+  const Icon = getPhaseIcon(phase.id);
+
+  const statusColors = {
+    pending: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500',
+    running: 'bg-blue-50 dark:bg-blue-950 border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400',
+    completed: 'bg-green-50 dark:bg-green-950 border-green-400 dark:border-green-500 text-green-600 dark:text-green-400',
+    error: 'bg-red-50 dark:bg-red-950 border-red-400 dark:border-red-500 text-red-600 dark:text-red-400',
+  };
+
+  const connectorColors = {
+    pending: 'bg-gray-300 dark:bg-gray-600',
+    running: 'bg-blue-400 dark:bg-blue-500',
+    completed: 'bg-green-400 dark:bg-green-500',
+    error: 'bg-red-400 dark:bg-red-500',
+  };
+
+  return (
+    <div className="flex flex-col items-center">
+      {/* Nodo */}
+      <div
+        className={`
+          relative w-20 h-20 rounded-2xl border-2 flex flex-col items-center justify-center
+          transition-all duration-300
+          ${statusColors[status]}
+          ${status === 'running' ? 'animate-pulse' : ''}
+        `}
+      >
+        {status === 'running' ? (
+          <Loader2 className="h-6 w-6 animate-spin" />
+        ) : status === 'completed' ? (
+          <CheckCircle className="h-6 w-6" />
+        ) : status === 'error' ? (
+          <XCircle className="h-6 w-6" />
+        ) : (
+          <Icon className="h-6 w-6" />
+        )}
+
+        {/* Progreso circular */}
+        {status === 'running' && progress !== undefined && (
+          <div className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-[10px] font-bold rounded-full w-6 h-6 flex items-center justify-center">
+            {progress}%
+          </div>
+        )}
+      </div>
+
+      {/* Label */}
+      <span className={`mt-2 text-xs font-medium text-center max-w-20 line-clamp-2 ${
+        status === 'pending' ? 'text-muted-foreground' : ''
+      }`}>
+        {phase.nombre}
+      </span>
+
+      {/* Conector */}
+      {!isLast && (
+        <div className="flex flex-col items-center mt-2 mb-2">
+          <div className={`w-0.5 h-4 ${connectorColors[status === 'completed' ? 'completed' : 'pending']}`} />
+          <ArrowDown className={`h-4 w-4 ${status === 'completed' ? 'text-green-500' : 'text-gray-400'}`} />
+          <div className={`w-0.5 h-4 ${connectorColors[status === 'completed' ? 'completed' : 'pending']}`} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Diagrama de flujo visual (solo visualización)
+function FlowDiagram({
+  phases,
+  phasesStatus,
+}: {
+  phases: ScriptFase[];
+  phasesStatus: Record<string, PhaseState>;
+}) {
+  return (
+    <div className="flex flex-col items-center py-4">
+      {phases.map((phase, index) => {
+        const state = phasesStatus[phase.id] || { status: 'pending' as PhaseStatus, progress: 0 };
+        return (
+          <PhaseNode
+            key={phase.id}
+            phase={phase}
+            status={state.status}
+            progress={state.progress}
+            isLast={index === phases.length - 1}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// Panel de detalle de fase
+function PhaseDetailPanel({
+  phase,
+  state,
+  onClose
+}: {
+  phase: ScriptFase;
+  state: PhaseState;
+  onClose: () => void;
+}) {
+  const statusLabels = {
+    pending: { label: 'Pendiente', color: 'bg-gray-100 text-gray-700' },
+    running: { label: 'En ejecución', color: 'bg-blue-100 text-blue-700' },
+    completed: { label: 'Completado', color: 'bg-green-100 text-green-700' },
+    error: { label: 'Error', color: 'bg-red-100 text-red-700' },
+  };
+
+  const { label, color } = statusLabels[state.status];
+
+  return (
+    <Card className="border-l-4 border-l-primary">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              {getPhaseIcon(phase.id)({ className: "h-5 w-5" })}
+              {phase.nombre}
+            </CardTitle>
+            {phase.descripcion && (
+              <CardDescription className="mt-1">{phase.descripcion}</CardDescription>
+            )}
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Estado */}
+        <div className="flex items-center gap-3">
+          <Badge className={color}>{label}</Badge>
+          {state.progress !== undefined && state.status === 'running' && (
+            <div className="flex-1">
+              <Progress value={state.progress} className="h-2" />
+            </div>
+          )}
+        </div>
+
+        {/* Tiempos */}
+        {(state.started_at || state.completed_at) && (
+          <div className="text-xs text-muted-foreground space-y-1">
+            {state.started_at && (
+              <p>Inicio: {new Date(state.started_at).toLocaleTimeString('es-MX')}</p>
+            )}
+            {state.completed_at && (
+              <p>Fin: {new Date(state.completed_at).toLocaleTimeString('es-MX')}</p>
+            )}
+          </div>
+        )}
+
+        {/* Logs de la fase */}
+        {state.logs && state.logs.length > 0 && (
+          <div>
+            <p className="text-xs font-medium mb-2 flex items-center gap-1">
+              <MessageSquare className="h-3 w-3" />
+              Mensajes
+            </p>
+            <ScrollArea className="h-32 rounded border bg-muted/30 p-2">
+              <div className="space-y-1">
+                {state.logs.map((log, i) => (
+                  <div key={i} className={`text-xs font-mono ${
+                    log.level === 'error' ? 'text-red-600' :
+                    log.level === 'warning' ? 'text-yellow-600' :
+                    'text-muted-foreground'
+                  }`}>
+                    <span className="opacity-50">
+                      {new Date(log.timestamp).toLocaleTimeString('es-MX', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      })}
+                    </span>
+                    {' '}{log.message}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Panel de error amigable
+function ErrorPanel({ error }: { error: string }) {
+  const translated = translateError(error);
+
+  return (
+    <div className="rounded-xl border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="p-2 rounded-full bg-red-100 dark:bg-red-900">
+          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-semibold text-red-800 dark:text-red-200">
+            {translated.message}
+          </h4>
+          <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+            {translated.recommendation}
+          </p>
+        </div>
+      </div>
+
+      {/* Detalle técnico colapsable */}
+      <Accordion type="single" collapsible>
+        <AccordionItem value="tech" className="border-0">
+          <AccordionTrigger className="py-2 text-xs text-red-600 dark:text-red-400 hover:no-underline">
+            <span className="flex items-center gap-1">
+              <Cpu className="h-3 w-3" />
+              Ver detalle técnico
+            </span>
+          </AccordionTrigger>
+          <AccordionContent>
+            <code className="text-xs font-mono bg-red-100 dark:bg-red-900/50 p-2 rounded block break-all">
+              {error}
+            </code>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
+}
+
+// Configurador de programación mejorado
+function ScheduleConfigurator({
+  value,
+  onChange
+}: {
+  value: string;
+  onChange: (cron: string) => void;
+}) {
+  const [mode, setMode] = useState<ScheduleMode>('daily');
+  const [hour, setHour] = useState('9');
+  const [minute, setMinute] = useState('0');
+  const [interval, setInterval] = useState('8');
+  const [weekdays, setWeekdays] = useState<string[]>(['1', '2', '3', '4', '5']);
+  const [customCron, setCustomCron] = useState(value);
+
+  // Actualizar cron cuando cambian los valores
+  useEffect(() => {
+    if (mode === 'cron') {
+      onChange(customCron);
+    } else {
+      const newCron = generateCronFromSchedule(mode, { hour, minute, interval, weekdays });
+      onChange(newCron);
+    }
+  }, [mode, hour, minute, interval, weekdays, customCron, onChange]);
+
+  return (
+    <div className="space-y-4">
+      {/* Selector de modo */}
+      <RadioGroup value={mode} onValueChange={(v) => setMode(v as ScheduleMode)} className="space-y-2">
+        {SCHEDULE_OPTIONS.map((option) => {
+          const Icon = option.icon;
+          return (
+            <label
+              key={option.value}
+              className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                mode === option.value
+                  ? 'border-primary bg-primary/5'
+                  : 'border-transparent bg-muted/50 hover:bg-muted'
+              }`}
+            >
+              <RadioGroupItem value={option.value} id={option.value} />
+              <Icon className={`h-5 w-5 ${mode === option.value ? 'text-primary' : 'text-muted-foreground'}`} />
+              <div className="flex-1">
+                <p className="font-medium text-sm">{option.label}</p>
+                <p className="text-xs text-muted-foreground">{option.desc}</p>
+              </div>
+            </label>
+          );
+        })}
+      </RadioGroup>
+
+      <Separator />
+
+      {/* Configuración según modo */}
+      {mode === 'hourly' && (
+        <div className="space-y-2">
+          <Label>Ejecutar cada</Label>
+          <div className="flex items-center gap-2">
+            <Select value={interval} onValueChange={setInterval}>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[2, 3, 4, 6, 8, 12].map((h) => (
+                  <SelectItem key={h} value={String(h)}>{h}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-sm text-muted-foreground">horas</span>
+          </div>
+        </div>
+      )}
+
+      {mode === 'daily' && (
+        <div className="space-y-2">
+          <Label>Hora de ejecución</Label>
+          <div className="flex items-center gap-2">
+            <Select value={hour} onValueChange={setHour}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 24 }, (_, i) => (
+                  <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-lg font-bold">:</span>
+            <Select value={minute} onValueChange={setMinute}>
+              <SelectTrigger className="w-20">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[0, 15, 30, 45].map((m) => (
+                  <SelectItem key={m} value={String(m)}>{String(m).padStart(2, '0')}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      {mode === 'weekly' && (
+        <div className="space-y-3">
+          <Label>Días de la semana</Label>
+          <div className="flex flex-wrap gap-2">
+            {WEEKDAYS.map((day) => (
+              <button
+                key={day.value}
+                type="button"
+                onClick={() => {
+                  setWeekdays(prev =>
+                    prev.includes(day.value)
+                      ? prev.filter(d => d !== day.value)
+                      : [...prev, day.value]
+                  );
+                }}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  weekdays.includes(day.value)
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80'
+                }`}
+              >
+                {day.label}
+              </button>
+            ))}
+          </div>
+          <div className="space-y-2">
+            <Label>Hora de ejecución</Label>
+            <div className="flex items-center gap-2">
+              <Select value={hour} onValueChange={setHour}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-lg font-bold">:</span>
+              <Select value={minute} onValueChange={setMinute}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[0, 15, 30, 45].map((m) => (
+                    <SelectItem key={m} value={String(m)}>{String(m).padStart(2, '0')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mode === 'cron' && (
+        <div className="space-y-2">
+          <Label>Expresión Cron</Label>
+          <Input
+            value={customCron}
+            onChange={(e) => setCustomCron(e.target.value)}
+            placeholder="0 9 * * *"
+            className="font-mono"
+          />
+          <p className="text-xs text-muted-foreground">
+            Formato: minuto hora día mes día-semana
+          </p>
+        </div>
+      )}
+
+      {/* Preview */}
+      {mode !== 'manual' && (
+        <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <span className="text-sm">
+              {interpretarCron(generateCronFromSchedule(mode, { hour, minute, interval, weekdays }))}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Editor de variables mejorado
+function VariablesEditor({
+  variables,
+  onChange,
+  requiredVariables = []
+}: {
+  variables: Record<string, string | number | boolean>;
+  onChange: (vars: Record<string, string | number | boolean>) => void;
+  requiredVariables?: ScriptVariable[];
+}) {
+  const [newKey, setNewKey] = useState('');
+  const [newValue, setNewValue] = useState('');
+
+  const addVariable = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!newKey.trim() || !newValue.trim()) return;
+
+    onChange({ ...variables, [newKey]: newValue });
+    setNewKey('');
+    setNewValue('');
+  };
+
+  const removeVariable = (key: string) => {
+    const { [key]: _, ...rest } = variables;
+    onChange(rest);
+  };
+
+  const updateVariable = (key: string, value: string) => {
+    onChange({ ...variables, [key]: value });
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Info */}
+      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+        <div className="flex items-start gap-2">
+          <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-blue-800 dark:text-blue-200">
+            Las variables personalizan cómo se ejecuta la automatización.
+            Define fechas, identificadores o cualquier parámetro que necesite el proceso.
+          </p>
+        </div>
+      </div>
+
+      {/* Variables del script */}
+      {requiredVariables.length > 0 && (
+        <div className="space-y-3">
+          <Label className="text-sm font-medium">Variables del Script</Label>
+          {requiredVariables.map((reqVar) => {
+            const currentValue = variables[reqVar.nombre] ?? reqVar.default ?? '';
+            return (
+              <div key={reqVar.nombre} className="bg-muted/50 rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{reqVar.nombre}</span>
+                    {reqVar.requerida && (
+                      <Badge variant="outline" className="text-[10px] h-5 border-orange-300 text-orange-600">
+                        Requerida
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{reqVar.descripcion}</p>
+
+                {reqVar.tipo === 'fecha' ? (
+                  <Input
+                    type="date"
+                    value={String(currentValue)}
+                    onChange={(e) => updateVariable(reqVar.nombre, e.target.value)}
+                    className="h-9"
+                  />
+                ) : reqVar.tipo === 'opcion' && reqVar.opciones ? (
+                  <Select value={String(currentValue)} onValueChange={(v) => updateVariable(reqVar.nombre, v)}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Selecciona una opción" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {reqVar.opciones.map((op) => (
+                        <SelectItem key={op} value={op}>{op}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    type={reqVar.tipo === 'numero' ? 'number' : 'text'}
+                    placeholder={reqVar.default || `Valor para ${reqVar.nombre}`}
+                    value={String(currentValue)}
+                    onChange={(e) => updateVariable(reqVar.nombre, e.target.value)}
+                    className="h-9"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Variables adicionales */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Variables Adicionales</Label>
+
+        {Object.entries(variables)
+          .filter(([key]) => !requiredVariables.some(rv => rv.nombre === key))
+          .map(([key, value]) => (
+            <div key={key} className="flex items-center gap-2 bg-muted/30 p-2 rounded-lg">
+              <code className="text-xs font-mono bg-background px-2 py-1 rounded border flex-1 truncate">
+                <span className="text-primary font-semibold">{key}</span>
+                <span className="text-muted-foreground"> = </span>
+                <span>{String(value)}</span>
+              </code>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeVariable(key)}
+                className="text-destructive hover:text-destructive h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+
+        <form onSubmit={addVariable} className="flex flex-col sm:flex-row gap-2 pt-1">
+          <Input
+            type="text"
+            placeholder="Nombre"
+            value={newKey}
+            onChange={e => setNewKey(e.target.value.toUpperCase().replace(/\s/g, '_'))}
+            className="text-sm flex-1 h-9"
+          />
+          <Input
+            type="text"
+            placeholder="Valor"
+            value={newValue}
+            onChange={e => setNewValue(e.target.value)}
+            className="text-sm flex-1 h-9"
+          />
+          <Button type="submit" variant="outline" size="sm" className="h-9">
+            <Plus className="h-4 w-4 mr-1" />
+            Agregar
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Panel de ejecución en tiempo real con diagrama de flujo
+function ExecutionMonitor({
+  executionId,
+  automatizacion,
+  phases,
+  onClose,
+  onCancel
+}: {
+  executionId: string;
+  automatizacion: Automatizacion;
+  phases?: ScriptFase[];
+  onClose: () => void;
+  onCancel: () => void;
+}) {
+  const { user } = useAuth();
+  const [status, setStatus] = useState<ExecutionStatus | null>(null);
+  const [phasesStatus, setPhasesStatus] = useState<Record<string, PhaseState>>({});
+  const pollRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Construir estado de fases a partir del status
+  useEffect(() => {
+    if (!phases || !status) return;
+
+    const newPhasesStatus: Record<string, PhaseState> = {};
+
+    phases.forEach((phase) => {
+      const isCompleted = status.phases_completed.includes(phase.id);
+      const isCurrent = status.current_phase?.id === phase.id;
+
+      // Filtrar mensajes de esta fase (simplificado)
+      const phaseLogs = status.messages.filter(m =>
+        m.message.toLowerCase().includes(phase.nombre.toLowerCase()) ||
+        m.message.toLowerCase().includes(phase.id.toLowerCase())
+      );
+
+      newPhasesStatus[phase.id] = {
+        id: phase.id,
+        nombre: phase.nombre,
+        descripcion: phase.descripcion,
+        status: status.status === 'error' && isCurrent ? 'error' :
+                isCompleted ? 'completed' :
+                isCurrent ? 'running' : 'pending',
+        progress: isCurrent ? status.progress.percentage : isCompleted ? 100 : 0,
+        started_at: isCurrent ? status.current_phase?.started_at : undefined,
+        logs: phaseLogs,
+      };
+    });
+
+    setPhasesStatus(newPhasesStatus);
+  }, [phases, status]);
+
+  const pollStatus = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        execution_id: executionId,
+        correo: user?.correo || '',
+        organizacion: user?.organizacion || '',
+      });
+
+      const response = await fetch(`${API_URL}/automatizaciones/status?${params}`, {
+        headers: getHeaders()
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setStatus(result.data);
+
+        if (result.data.status !== 'running') {
+          if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error polling status:', err);
+    }
+  }, [executionId, user?.correo, user?.organizacion]);
+
+  useEffect(() => {
+    pollStatus();
+    pollRef.current = setInterval(pollStatus, 1500);
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+      }
+    };
+  }, [pollStatus]);
+
+  const handleCancel = async () => {
+    try {
+      const response = await fetch(`${API_URL}/automatizaciones/ejecutar`, {
+        method: 'DELETE',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          correo_admin: user?.correo,
+          organizacion: user?.organizacion,
+          execution_id: executionId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        toast({ title: "Ejecución cancelada" });
+        onCancel();
+      }
+    } catch (err) {
+      toast({
+        title: "Error al cancelar",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const isRunning = status?.status === 'running';
+  const isCompleted = status?.status === 'completed';
+  const isError = status?.status === 'error';
+
+  return (
+    <div className="space-y-6">
+      {/* Header con estado global */}
+      <div className={`rounded-xl p-4 ${
+        isCompleted ? 'bg-green-50 dark:bg-green-950/30 border-2 border-green-300 dark:border-green-700' :
+        isError ? 'bg-red-50 dark:bg-red-950/30 border-2 border-red-300 dark:border-red-700' :
+        'bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-300 dark:border-blue-700'
+      }`}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            {isRunning && <Loader2 className="h-6 w-6 text-blue-600 animate-spin" />}
+            {isCompleted && <CheckCircle className="h-6 w-6 text-green-600" />}
+            {isError && <XCircle className="h-6 w-6 text-red-600" />}
+            <div>
+              <h3 className="font-semibold text-lg">{automatizacion.nombre_display}</h3>
+              <p className="text-sm text-muted-foreground">
+                {isRunning && `Ejecutando: ${status?.current_phase?.nombre || 'Iniciando...'}`}
+                {isCompleted && 'Proceso completado exitosamente'}
+                {isError && 'El proceso finalizó con errores'}
+              </p>
+            </div>
+          </div>
+          {isRunning && (
+            <Button variant="outline" size="sm" onClick={handleCancel} className="text-destructive border-destructive">
+              <StopCircle className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+          )}
+        </div>
+
+        {/* Progreso global */}
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="font-medium">Progreso total</span>
+            <span className="text-muted-foreground">{status?.progress?.percentage || 0}%</span>
+          </div>
+          <Progress
+            value={status?.progress?.percentage || 0}
+            className={`h-3 ${isCompleted ? '[&>div]:bg-green-500' : isError ? '[&>div]:bg-red-500' : ''}`}
+          />
+          {(status?.progress?.items_total ?? 0) > 0 && (
+            <p className="text-xs text-muted-foreground text-right">
+              {status?.progress?.items_processed} de {status?.progress?.items_total} elementos procesados
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Contenido principal */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Diagrama de flujo */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Flujo del Proceso
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {phases && phases.length > 0 ? (
+              <FlowDiagram
+                phases={phases}
+                phasesStatus={phasesStatus}
+              />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Sin información de fases</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Log de actividad */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                Log de Actividad
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px] w-full rounded border bg-muted/30 p-3">
+                {status?.messages && status.messages.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {status.messages.map((msg, i) => (
+                      <div key={i} className={`text-xs font-mono flex gap-2 ${
+                        msg.level === 'error' ? 'text-red-600' :
+                        msg.level === 'warning' ? 'text-yellow-600' :
+                        'text-muted-foreground'
+                      }`}>
+                        <span className="opacity-50 shrink-0">
+                          {new Date(msg.timestamp).toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit'
+                          })}
+                        </span>
+                        <span>{msg.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-8">
+                    Esperando mensajes...
+                  </p>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {/* Error amigable */}
+          {isError && status?.error && (
+            <ErrorPanel error={status.error} />
+          )}
+        </div>
+      </div>
+
+      {/* Botón de cerrar */}
+      {!isRunning && (
+        <Button onClick={onClose} className="w-full h-11">
+          {isCompleted ? (
+            <>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Cerrar
+            </>
+          ) : (
+            <>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Entendido
+            </>
+          )}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ==================== COMPONENTE PRINCIPAL ====================
 
 export function AutomationsSection() {
   const { user: currentUser } = useAuth();
@@ -142,35 +1162,41 @@ export function AutomationsSection() {
   const [automatizaciones, setAutomatizaciones] = useState<Automatizacion[]>([]);
   const [logs, setLogs] = useState<LogEjecucion[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Diálogos
   const [dialogConfigOpen, setDialogConfigOpen] = useState(false);
   const [dialogLogsOpen, setDialogLogsOpen] = useState(false);
   const [dialogEditOpen, setDialogEditOpen] = useState(false);
+  const [dialogExecutionOpen, setDialogExecutionOpen] = useState(false);
+  const [dialogDetailOpen, setDialogDetailOpen] = useState(false);
+
+  // Selecciones
   const [scriptSeleccionado, setScriptSeleccionado] = useState<ScriptDisponible | null>(null);
   const [automatizacionSeleccionada, setAutomatizacionSeleccionada] = useState<Automatizacion | null>(null);
+  const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
 
+  // Formularios
   const [formConfig, setFormConfig] = useState({
-    cron_expresion: '0 8,16 * * *',
+    cron_expresion: '0 9 * * *',
     descripcion: '',
-    cronMode: 'preset' as 'preset' | 'custom', // Modo selector visual o manual
-    customHour: '09',
-    customMinute: '00',
     variables_personalizadas: {} as Record<string, string | number | boolean>,
   });
 
   const [formEdit, setFormEdit] = useState({
     descripcion: '',
     cron_expresion: '',
-    cronMode: 'preset' as 'preset' | 'custom',
-    customHour: '09',
-    customMinute: '00',
     variables_personalizadas: {} as Record<string, string | number | boolean>,
   });
 
   const isAdmin = currentUser?.tipo_usuario === 'administrador';
 
+  // ==================== EFECTOS ====================
+
   useEffect(() => {
     cargarDatos();
   }, []);
+
+  // ==================== FUNCIONES DE CARGA ====================
 
   const cargarDatos = async () => {
     await Promise.all([cargarScriptsDisponibles(), cargarAutomatizaciones()]);
@@ -179,59 +1205,47 @@ export function AutomationsSection() {
 
   const cargarScriptsDisponibles = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) {
-        console.log('⚠️ No hay usuario o organización:', { correo: currentUser?.correo, org: currentUser?.organizacion });
-        return;
-      }
+      if (!currentUser?.correo || !currentUser?.organizacion) return;
 
-      const url = `${API_URL}/automatizaciones/disponibles?organizacion=${encodeURIComponent(currentUser.organizacion)}&correo=${encodeURIComponent(currentUser.correo)}`;
-      console.log('📤 Solicitando scripts:', url);
+      const params = new URLSearchParams({
+        organizacion: currentUser.organizacion,
+        correo: currentUser.correo,
+      });
 
-      const response = await fetch(url, {
-        method: 'GET',
+      const response = await fetch(`${API_URL}/automatizaciones/disponibles?${params}`, {
         headers: getHeaders()
       });
-      
+
       const result = await response.json();
-      console.log('📥 Respuesta scripts:', result);
-      
+
       if (result.success) {
-        const scripts = result.data.scripts_disponibles || [];
-        console.log('✅ Scripts disponibles:', scripts.length, scripts);
-        setScriptsDisponibles(scripts);
-      } else {
-        console.error('❌ Error en respuesta:', result.message);
+        setScriptsDisponibles(result.data.scripts_disponibles || []);
       }
     } catch (error) {
-      console.error('❌ Error cargando scripts disponibles:', error);
+      console.error('Error cargando scripts:', error);
     }
   };
 
   const cargarAutomatizaciones = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) {
-        console.log('⚠️ No hay usuario para cargar automatizaciones');
-        return;
-      }
+      if (!currentUser?.correo || !currentUser?.organizacion) return;
 
-      const url = `${API_URL}/automatizaciones?organizacion=${encodeURIComponent(currentUser.organizacion)}&correo=${encodeURIComponent(currentUser.correo)}`;
-      console.log('📤 Solicitando automatizaciones:', url);
+      const params = new URLSearchParams({
+        organizacion: currentUser.organizacion,
+        correo: currentUser.correo,
+      });
 
-      const response = await fetch(url, {
-        method: 'GET',
+      const response = await fetch(`${API_URL}/automatizaciones?${params}`, {
         headers: getHeaders()
       });
-      
+
       const result = await response.json();
-      console.log('📥 Respuesta automatizaciones:', result);
-      
+
       if (result.success) {
-        const autos = result.data.automatizaciones || [];
-        console.log('✅ Automatizaciones configuradas:', autos.length);
-        setAutomatizaciones(autos);
+        setAutomatizaciones(result.data.automatizaciones || []);
       }
     } catch (error) {
-      console.error('❌ Error cargando automatizaciones:', error);
+      console.error('Error cargando automatizaciones:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar las automatizaciones",
@@ -242,73 +1256,83 @@ export function AutomationsSection() {
 
   const cargarLogs = async (idAutomatizacion: number) => {
     try {
-      const url = `${API_URL}/automatizaciones/logs?organizacion=${encodeURIComponent(currentUser?.organizacion || '')}&correo=${encodeURIComponent(currentUser?.correo || '')}&id_automatizacion=${idAutomatizacion}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
+      const params = new URLSearchParams({
+        organizacion: currentUser?.organizacion || '',
+        correo: currentUser?.correo || '',
+        id_automatizacion: String(idAutomatizacion),
+      });
+
+      const response = await fetch(`${API_URL}/automatizaciones/logs?${params}`, {
         headers: getHeaders()
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
         setLogs(result.data.logs || []);
       }
     } catch (error) {
-      console.error('❌ Error cargando logs:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los logs",
-        variant: "destructive",
-      });
+      console.error('Error cargando logs:', error);
     }
   };
 
+  // ==================== ACCIONES ====================
+
   const abrirDialogConfig = (script: ScriptDisponible) => {
     setScriptSeleccionado(script);
+
+    const varsIniciales: Record<string, string> = {};
+    if (script.metadata?.variables_requeridas) {
+      script.metadata.variables_requeridas.forEach(v => {
+        if (v.default) {
+          varsIniciales[v.nombre] = v.default;
+        }
+      });
+    }
+
     setFormConfig({
-      cron_expresion: '0 8,16 * * *',
-      descripcion: script.descripcion_sugerida,
-      cronMode: 'preset',
-      customHour: '09',
-      customMinute: '00',
-      variables_personalizadas: {},
+      cron_expresion: '0 9 * * *',
+      descripcion: script.metadata?.descripcion || script.descripcion_sugerida || '',
+      variables_personalizadas: varsIniciales,
     });
     setDialogConfigOpen(true);
+  };
+
+  const abrirDialogDetail = (script: ScriptDisponible) => {
+    setScriptSeleccionado(script);
+    setDialogDetailOpen(true);
   };
 
   const configurarAutomatizacion = async () => {
     if (!scriptSeleccionado) return;
 
-    // Validar expresión cron
-    const validacion = validarCron(formConfig.cron_expresion);
-    if (!validacion.valido) {
-      toast({
-        title: "Horario no permitido",
-        description: validacion.mensaje,
-        variant: "destructive",
-      });
-      return;
+    if (formConfig.cron_expresion !== 'manual') {
+      const validacion = validarCron(formConfig.cron_expresion);
+      if (!validacion.valido) {
+        toast({
+          title: "Configuración inválida",
+          description: validacion.mensaje,
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     try {
-      // Asegurar que el nombre tenga el prefijo prod_
       const nombreBase = scriptSeleccionado.script_path.replace('.py', '');
       const nombreConPrefijo = nombreBase.startsWith('prod_') ? nombreBase : `prod_${nombreBase}`;
-      
+
       const payload = {
         correo_admin: currentUser?.correo,
         organizacion: currentUser?.organizacion,
-        nombre: nombreConPrefijo, // Nombre con prefijo prod_ garantizado
+        nombre: nombreConPrefijo,
         descripcion: formConfig.descripcion,
         script_path: scriptSeleccionado.script_path,
-        cron_expresion: formConfig.cron_expresion,
-        ...(Object.keys(formConfig.variables_personalizadas || {}).length > 0 && {
+        cron_expresion: formConfig.cron_expresion === 'manual' ? '0 0 31 2 *' : formConfig.cron_expresion,
+        ...(Object.keys(formConfig.variables_personalizadas).length > 0 && {
           variables_personalizadas: formConfig.variables_personalizadas
         })
       };
-
-      console.log('📤 Enviando configuración:', payload);
 
       const response = await fetch(`${API_URL}/automatizaciones`, {
         method: 'POST',
@@ -317,23 +1341,21 @@ export function AutomationsSection() {
       });
 
       const result = await response.json();
-      console.log('📥 Respuesta del servidor:', result);
-      
+
       if (result.success) {
         toast({
           title: "Automatización configurada",
-          description: `${result.data.nombre_display} fue configurada (deshabilitada por defecto)`,
+          description: "Se creó deshabilitada. Actívala cuando estés listo.",
         });
         cargarDatos();
-        closeDialog();
+        setDialogConfigOpen(false);
       } else {
-        throw new Error(result.message || 'Error al configurar');
+        throw new Error(result.message);
       }
     } catch (error) {
-      console.error('❌ Error configurando automatización:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo configurar la automatización",
+        description: error instanceof Error ? error.message : "No se pudo configurar",
         variant: "destructive",
       });
     }
@@ -353,29 +1375,23 @@ export function AutomationsSection() {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
-        toast({
-          title: !estadoActual ? "Automatización activada" : "Automatización desactivada",
-          description: result.message,
-        });
+        toast({ title: !estadoActual ? "Activada" : "Desactivada" });
         cargarAutomatizaciones();
       } else {
-        throw new Error(result.message || 'Error al cambiar estado');
+        throw new Error(result.message);
       }
     } catch (error) {
-      console.error('❌ Error cambiando estado:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo cambiar el estado",
+        description: error instanceof Error ? error.message : "No se pudo cambiar estado",
         variant: "destructive",
       });
     }
   };
 
-  const ejecutarManual = async (id: number, nombre: string) => {
-    if (!confirm(`¿Ejecutar "${nombre}" manualmente ahora?`)) return;
-
+  const ejecutarManual = async (auto: Automatizacion) => {
     try {
       const response = await fetch(`${API_URL}/automatizaciones/ejecutar`, {
         method: 'POST',
@@ -383,27 +1399,23 @@ export function AutomationsSection() {
         body: JSON.stringify({
           correo_admin: currentUser?.correo,
           organizacion: currentUser?.organizacion,
-          id_automatizacion: id,
+          id_automatizacion: auto.id,
         }),
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
-        toast({
-          title: "Ejecución iniciada",
-          description: "La automatización se está ejecutando en segundo plano",
-        });
-        // Recargar después de unos segundos
-        setTimeout(() => cargarAutomatizaciones(), 3000);
+        setAutomatizacionSeleccionada(auto);
+        setCurrentExecutionId(result.data.execution_id);
+        setDialogExecutionOpen(true);
       } else {
-        throw new Error(result.message || 'Error al ejecutar');
+        throw new Error(result.message);
       }
     } catch (error) {
-      console.error('❌ Error ejecutando automatización:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "No se pudo ejecutar la automatización",
+        description: error instanceof Error ? error.message : "No se pudo ejecutar",
         variant: "destructive",
       });
     }
@@ -417,47 +1429,16 @@ export function AutomationsSection() {
 
   const abrirDialogEdit = (auto: Automatizacion) => {
     setAutomatizacionSeleccionada(auto);
-    // Extraer hora y minuto del cron si es posible
-    const cronParts = auto.cron_expresion.split(' ');
-    const minute = cronParts[0] || '00';
-    const hour = cronParts[1] || '09';
     setFormEdit({
       descripcion: auto.descripcion,
       cron_expresion: auto.cron_expresion,
-      cronMode: 'preset',
-      customHour: hour,
-      customMinute: minute,
       variables_personalizadas: auto.variables_personalizadas || {},
     });
     setDialogEditOpen(true);
   };
 
-  const closeDialog = () => {
-    setDialogConfigOpen(false);
-    setScriptSeleccionado(null);
-    setFormConfig({
-      cron_expresion: '0 8,16 * * *',
-      descripcion: '',
-      cronMode: 'preset',
-      customHour: '09',
-      customMinute: '00',
-      variables_personalizadas: {},
-    });
-  };
-
   const editarAutomatizacion = async () => {
     if (!automatizacionSeleccionada) return;
-
-    // Validar expresión cron
-    const validacion = validarCron(formEdit.cron_expresion);
-    if (!validacion.valido) {
-      toast({
-        title: "Horario no permitido",
-        description: validacion.mensaje,
-        variant: "destructive",
-      });
-      return;
-    }
 
     try {
       const payload = {
@@ -466,12 +1447,10 @@ export function AutomationsSection() {
         id_automatizacion: automatizacionSeleccionada.id,
         descripcion: formEdit.descripcion,
         cron_expresion: formEdit.cron_expresion,
-        ...(Object.keys(formEdit.variables_personalizadas || {}).length > 0 && {
+        ...(Object.keys(formEdit.variables_personalizadas).length > 0 && {
           variables_personalizadas: formEdit.variables_personalizadas
         })
       };
-
-      console.log('📤 Editando automatización:', payload);
 
       const response = await fetch(`${API_URL}/automatizaciones`, {
         method: 'PATCH',
@@ -480,20 +1459,15 @@ export function AutomationsSection() {
       });
 
       const result = await response.json();
-      console.log('📥 Respuesta del servidor:', result);
-      
+
       if (result.success) {
-        toast({
-          title: "Automatización actualizada",
-          description: "Los cambios se guardaron correctamente",
-        });
+        toast({ title: "Cambios guardados" });
         cargarAutomatizaciones();
         setDialogEditOpen(false);
       } else {
-        throw new Error(result.message || 'Error al actualizar');
+        throw new Error(result.message);
       }
     } catch (error) {
-      console.error('❌ Error actualizando automatización:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo actualizar",
@@ -503,7 +1477,7 @@ export function AutomationsSection() {
   };
 
   const eliminarAutomatizacion = async (id: number, nombre: string) => {
-    if (!confirm(`¿Estás seguro de eliminar "${nombre}"? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar "${nombre}"? Esta acción no se puede deshacer.`)) return;
 
     try {
       const response = await fetch(`${API_URL}/automatizaciones`, {
@@ -517,18 +1491,14 @@ export function AutomationsSection() {
       });
 
       const result = await response.json();
-      
+
       if (result.success) {
-        toast({
-          title: "Automatización eliminada",
-          description: "La automatización fue eliminada correctamente",
-        });
+        toast({ title: "Eliminada correctamente" });
         cargarDatos();
       } else {
-        throw new Error(result.message || 'Error al eliminar');
+        throw new Error(result.message);
       }
     } catch (error) {
-      console.error('❌ Error eliminando automatización:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo eliminar",
@@ -537,142 +1507,37 @@ export function AutomationsSection() {
     }
   };
 
+  // ==================== RENDERS ====================
+
   const getEstadoBadge = (estado: 'exitoso' | 'error' | null) => {
-    if (!estado) return <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">Sin ejecuciones</Badge>;
+    if (!estado) return <Badge variant="secondary">Sin ejecuciones</Badge>;
     if (estado === 'exitoso') {
-      return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle className="h-3 w-3 mr-1" />Exitoso</Badge>;
+      return (
+        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200">
+          <CheckCircle className="h-3 w-3 mr-1" />Exitoso
+        </Badge>
+      );
     }
-    return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><XCircle className="h-3 w-3 mr-1" />Error</Badge>;
-  };
-
-  // Componente para editar variables personalizadas
-  const CustomVariablesEditor = ({ 
-    variables, 
-    onChange 
-  }: { 
-    variables: Record<string, string | number | boolean>;
-    onChange: (vars: Record<string, string | number | boolean>) => void;
-  }) => {
-    const [newKey, setNewKey] = useState('');
-    const [newValue, setNewValue] = useState('');
-    
-    const addVariable = (e?: React.FormEvent) => {
-      e?.preventDefault();
-      if (!newKey.trim() || !newValue.trim()) {
-        toast({
-          title: "Error",
-          description: "Debes proporcionar tanto el nombre como el valor de la variable",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (variables.hasOwnProperty(newKey)) {
-        toast({
-          title: "Error",
-          description: `La variable "${newKey}" ya existe`,
-          variant: "destructive",
-        });
-        return;
-      }
-      onChange({ ...variables, [newKey]: newValue });
-      setNewKey('');
-      setNewValue('');
-    };
-    
-    const removeVariable = (key: string) => {
-      const { [key]: _, ...rest } = variables;
-      onChange(rest);
-    };
-    
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        addVariable();
-      }
-    };
-    
     return (
-      <div className="space-y-2">
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-            <div className="text-xs text-blue-900 dark:text-blue-200">
-              <p className="font-medium mb-1">Variables personalizadas</p>
-              <p className="text-blue-700 dark:text-blue-300">
-                Se pasan al script Python como variables de entorno con prefijo <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">SAT_VAR_</code>
-              </p>
-              <p className="text-blue-700 dark:text-blue-300 mt-1">
-                Ejemplo: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">rfc_objetivo</code> → <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">SAT_VAR_RFC_OBJETIVO</code>
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {Object.keys(variables).length > 0 && (
-          <div className="space-y-2 mb-3">
-            {Object.entries(variables).map(([key, value]) => (
-              <div key={key} className="flex items-center gap-2 bg-muted/50 p-2 rounded-lg">
-                <span className="text-xs font-mono bg-background px-2 py-1 rounded border flex-1">
-                  <span className="text-primary font-semibold">{key}</span>: {String(value)}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeVariable(key)}
-                  className="text-red-500 hover:text-red-700 h-8 w-8 p-0"
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-        
-        <form onSubmit={addVariable} className="flex flex-col sm:flex-row gap-2">
-          <Input
-            type="text"
-            placeholder="Variable (ej: rfc_objetivo)"
-            value={newKey}
-            onChange={e => setNewKey(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="text-sm flex-1"
-          />
-          <Input
-            type="text"
-            placeholder="Valor (ej: ABC123456DEF)"
-            value={newValue}
-            onChange={e => setNewValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            className="text-sm flex-1"
-          />
-          <Button
-            type="button"
-            onClick={(e) => addVariable(e)}
-            variant="outline"
-            size="sm"
-            className="whitespace-nowrap"
-          >
-            + Agregar
-          </Button>
-        </form>
-
-        {Object.keys(variables).length === 0 && (
-          <p className="text-xs text-muted-foreground italic text-center py-2">
-            No hay variables personalizadas. Agrega una si tu script las requiere.
-          </p>
-        )}
-      </div>
+      <Badge className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">
+        <XCircle className="h-3 w-3 mr-1" />Error
+      </Badge>
     );
   };
 
   if (loading) {
-    return <div className="flex items-center justify-center p-8">Cargando automatizaciones...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center p-12 gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Cargando automatizaciones...</p>
+      </div>
+    );
   }
 
   if (!isAdmin) {
     return (
-      <div className="text-center p-8">
+      <div className="flex flex-col items-center justify-center p-12 gap-4">
+        <AlertCircle className="h-12 w-12 text-muted-foreground" />
         <p className="text-muted-foreground">No tienes permisos para acceder a esta sección</p>
       </div>
     );
@@ -681,839 +1546,538 @@ export function AutomationsSection() {
   const scriptsNoConfigurados = scriptsDisponibles.filter(s => !s.configurado);
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Automatizaciones</h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Gestiona las automatizaciones productivas de tu organización
+        <h1 className="text-2xl md:text-3xl font-bold">Automatizaciones</h1>
+        <p className="text-muted-foreground mt-1">
+          Configura y monitorea procesos automatizados para tu organización
         </p>
       </div>
 
       {/* Scripts Disponibles */}
       {scriptsNoConfigurados.length > 0 && (
-        <div className="space-y-3">
+        <section className="space-y-4">
           <div className="flex items-center gap-2">
             <FileCode className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-semibold">
-              Scripts Disponibles ({scriptsNoConfigurados.length})
-            </h3>
+            <h2 className="text-lg font-semibold">Scripts Disponibles</h2>
+            <Badge variant="secondary">{scriptsNoConfigurados.length}</Badge>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {scriptsNoConfigurados.map((script) => (
-              <Card 
-                key={script.script_path} 
-                className="p-4 md:p-5 hover:shadow-lg transition-all cursor-pointer active:scale-95"
-                onClick={() => abrirDialogConfig(script)}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="p-3 bg-primary/10 rounded-xl">
-                    <FileCode className="h-6 w-6 md:h-7 md:w-7 text-primary" />
+              <Card key={script.script_path} className="overflow-hidden hover:shadow-lg transition-all group">
+                <div className="p-4 pb-3 border-b bg-muted/30">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className="p-2.5 bg-primary/10 rounded-xl shrink-0 group-hover:bg-primary/20 transition-colors">
+                        <FileCode className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base capitalize truncate">
+                          {script.metadata?.nombre || script.nombre_display}
+                        </h3>
+                        <code className="text-[10px] text-muted-foreground">{script.script_path}</code>
+                      </div>
+                    </div>
+                    {script.es_especifico_org && (
+                      <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 shrink-0">
+                        <Zap className="h-3 w-3 mr-1" />Exclusivo
+                      </Badge>
+                    )}
                   </div>
-                  {script.es_especifico_org && (
-                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs">
-                      <Zap className="h-3 w-3 mr-1" />
-                      Exclusivo
-                    </Badge>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  {(script.metadata?.descripcion || script.descripcion_sugerida) && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {script.metadata?.descripcion || script.descripcion_sugerida}
+                    </p>
+                  )}
+
+                  {/* Preview de fases */}
+                  {script.metadata?.fases && script.metadata.fases.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex -space-x-1">
+                        {script.metadata.fases.slice(0, 4).map((fase) => {
+                          const Icon = getPhaseIcon(fase.id);
+                          return (
+                            <div key={fase.id} className="w-6 h-6 rounded-full bg-muted flex items-center justify-center border-2 border-background">
+                              <Icon className="h-3 w-3 text-muted-foreground" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {script.metadata.fases.length} fases
+                      </span>
+                    </div>
+                  )}
+
+                  {script.metadata?.variables_requeridas && script.metadata.variables_requeridas.length > 0 && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Variable className="h-3 w-3" />
+                      <span>{script.metadata.variables_requeridas.filter(v => v.requerida).length} variables requeridas</span>
+                    </div>
                   )}
                 </div>
-                <h4 className="font-semibold text-base md:text-lg mb-2 capitalize">
-                  {script.nombre_display}
-                </h4>
-                <p className="text-xs text-muted-foreground mb-4">
-                  <code className="bg-muted px-1.5 py-0.5 rounded text-[10px] md:text-xs">
-                    {script.script_path}
-                  </code>
-                </p>
-                <Button
-                  size="lg"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    abrirDialogConfig(script);
-                  }}
-                  className="w-full h-11 md:h-12 text-base"
-                >
-                  <Settings2 className="h-5 w-5 mr-2" />
-                  Configurar
-                </Button>
+
+                <div className="p-4 pt-0 flex gap-2">
+                  {script.tiene_metadata && (
+                    <Button variant="ghost" size="sm" onClick={() => abrirDialogDetail(script)} className="flex-1">
+                      <Eye className="h-4 w-4 mr-1" />Ver detalles
+                    </Button>
+                  )}
+                  <Button size="sm" onClick={() => abrirDialogConfig(script)} className="flex-1">
+                    <Settings2 className="h-4 w-4 mr-1" />Configurar
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
+      <Separator />
+
       {/* Automatizaciones Configuradas */}
-      <div className="space-y-3">
+      <section className="space-y-4">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold">
-            Automatizaciones Activas ({automatizaciones.length})
-          </h3>
+          <h2 className="text-lg font-semibold">Mis Automatizaciones</h2>
+          <Badge variant="secondary">{automatizaciones.length}</Badge>
         </div>
 
         {automatizaciones.length === 0 ? (
-          <Card className="p-8 md:p-12 text-center border-2 border-dashed">
+          <Card className="p-12 text-center border-2 border-dashed">
             <div className="inline-block p-6 bg-muted rounded-full mb-4">
-              <Settings2 className="h-16 w-16 md:h-20 md:w-20 text-muted-foreground" />
+              <Zap className="h-12 w-12 text-muted-foreground" />
             </div>
-            <h3 className="text-lg md:text-xl font-medium mb-2">No hay automatizaciones configuradas</h3>
-            <p className="text-sm md:text-base text-muted-foreground mb-4">
-              Configura un script disponible para comenzar
+            <h3 className="text-lg font-medium mb-2">No hay automatizaciones configuradas</h3>
+            <p className="text-muted-foreground mb-4">
+              Configura un script disponible para comenzar a automatizar procesos
             </p>
-            {scriptsNoConfigurados.length > 0 && (
-              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {scriptsNoConfigurados.length} scripts disponibles
-              </Badge>
-            )}
           </Card>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {automatizaciones.map((auto) => (
-              <Card key={auto.id} className="p-4 md:p-6 hover:shadow-xl transition-all border-2">
-                <div className="space-y-4">
-                  {/* Header con icono grande */}
+              <Card key={auto.id} className="overflow-hidden">
+                <div className={`p-4 border-b ${auto.activo ? 'bg-green-50/50 dark:bg-green-950/20' : 'bg-muted/30'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className={`p-3 rounded-xl ${auto.activo ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-800'}`}>
-                        <Zap className={`h-7 w-7 ${auto.activo ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} />
+                      <div className={`p-2.5 rounded-xl ${auto.activo ? 'bg-green-100 dark:bg-green-900/50' : 'bg-muted'}`}>
+                        <Zap className={`h-6 w-6 ${auto.activo ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-semibold text-base md:text-lg capitalize truncate">
-                          {auto.nombre_display}
-                        </h4>
-                        <p className="text-xs md:text-sm text-muted-foreground line-clamp-2 mt-1">
-                          {auto.descripcion}
-                        </p>
+                        <h3 className="font-semibold text-base capitalize truncate">{auto.nombre_display}</h3>
+                        <p className="text-sm text-muted-foreground line-clamp-1">{auto.descripcion}</p>
                       </div>
                     </div>
-                    <div className="shrink-0">
-                      <Switch
-                        checked={auto.activo}
-                        onCheckedChange={() => toggleActivo(auto.id, auto.activo)}
-                        className="data-[state=checked]:bg-green-500"
-                      />
-                    </div>
+                    <Switch
+                      checked={auto.activo}
+                      onCheckedChange={() => toggleActivo(auto.id, auto.activo)}
+                      className="data-[state=checked]:bg-green-500"
+                    />
                   </div>
+                </div>
 
-                  {/* Estado con icono animado */}
-                  <div className="flex items-center gap-2">
-                    <Badge className={auto.activo 
-                      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs md:text-sm px-3 py-1.5 flex items-center gap-1.5" 
-                      : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 text-xs md:text-sm px-3 py-1.5 flex items-center gap-1.5"
-                    }>
+                <div className="p-4 space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className={auto.activo ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300" : "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"}>
                       {auto.activo ? (
-                        <>
-                          <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                          Activo
-                        </>
+                        <><span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse" />Activo</>
                       ) : (
-                        <>
-                          <span className="inline-block w-2 h-2 bg-gray-400 rounded-full" />
-                          Inactivo
-                        </>
+                        <><span className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-1.5" />Inactivo</>
                       )}
                     </Badge>
-                    <div className="flex items-center gap-1.5 text-xs md:text-sm text-muted-foreground bg-muted px-3 py-1.5 rounded-full">
-                      <Clock className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                      <span className="font-medium">{interpretarCron(auto.cron_expresion)}</span>
-                    </div>
+                    <Badge variant="outline" className="gap-1">
+                      <Clock className="h-3 w-3" />
+                      {interpretarCron(auto.cron_expresion)}
+                    </Badge>
                   </div>
 
-                  {/* Última Ejecución con iconos */}
                   {auto.ultima_ejecucion ? (
-                    <div className={`rounded-lg p-3 border-2 ${
-                      auto.ultima_estado === 'exitoso' 
-                        ? 'bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-800' 
-                        : 'bg-red-50/50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-                    }`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <div className="text-xs text-muted-foreground font-medium">Última ejecución</div>
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs md:text-sm font-medium">
-                          {new Date(auto.ultima_ejecucion).toLocaleDateString('es-MX', {
-                            day: '2-digit',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
+                    <div className={`rounded-lg p-3 ${auto.ultima_estado === 'exitoso' ? 'bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800'}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Última ejecución</p>
+                          <p className="text-sm font-medium">
+                            {new Date(auto.ultima_ejecucion).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
                         {getEstadoBadge(auto.ultima_estado)}
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-muted/30 rounded-lg p-3 text-center border-2 border-dashed">
-                      <Clock className="h-5 w-5 mx-auto text-muted-foreground mb-1" />
-                      <span className="text-xs md:text-sm text-muted-foreground">Sin ejecuciones aún</span>
+                    <div className="rounded-lg p-3 bg-muted/30 border-2 border-dashed text-center">
+                      <p className="text-sm text-muted-foreground">Sin ejecuciones aún</p>
                     </div>
                   )}
 
-                  {/* Estadísticas con iconos mejorados */}
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-900/10 rounded-lg p-3 text-center border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <TrendingUp className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
-                        {auto.total_ejecuciones}
-                      </div>
-                      <div className="text-[10px] md:text-xs text-blue-700 dark:text-blue-300 font-medium">Total</div>
+                    <div className="text-center p-2 rounded-lg bg-blue-50 dark:bg-blue-950/30">
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{auto.total_ejecuciones}</p>
+                      <p className="text-[10px] text-blue-700 dark:text-blue-300">Total</p>
                     </div>
-                    <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10 rounded-lg p-3 text-center border border-green-200 dark:border-green-800">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div className="text-xl md:text-2xl font-bold text-green-600 dark:text-green-400">
-                        {auto.ejecuciones_exitosas}
-                      </div>
-                      <div className="text-[10px] md:text-xs text-green-700 dark:text-green-300 font-medium">Exitosas</div>
+                    <div className="text-center p-2 rounded-lg bg-green-50 dark:bg-green-950/30">
+                      <p className="text-lg font-bold text-green-600 dark:text-green-400">{auto.ejecuciones_exitosas}</p>
+                      <p className="text-[10px] text-green-700 dark:text-green-300">Exitosas</p>
                     </div>
-                    <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-900/10 rounded-lg p-3 text-center border border-red-200 dark:border-red-800">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
-                      </div>
-                      <div className="text-xl md:text-2xl font-bold text-red-600 dark:text-red-400">
-                        {auto.ejecuciones_error}
-                      </div>
-                      <div className="text-[10px] md:text-xs text-red-700 dark:text-red-300 font-medium">Errores</div>
+                    <div className="text-center p-2 rounded-lg bg-red-50 dark:bg-red-950/30">
+                      <p className="text-lg font-bold text-red-600 dark:text-red-400">{auto.ejecuciones_error}</p>
+                      <p className="text-[10px] text-red-700 dark:text-red-300">Errores</p>
                     </div>
                   </div>
 
-                  {/* Variables personalizadas */}
                   {auto.variables_personalizadas && Object.keys(auto.variables_personalizadas).length > 0 && (
-                    <details className="bg-muted/30 rounded-lg border-2 border-dashed">
-                      <summary className="text-xs cursor-pointer p-3 hover:bg-muted/50 transition-colors font-medium flex items-center gap-2">
-                        <Settings2 className="h-3.5 w-3.5" />
-                        Variables personalizadas ({Object.keys(auto.variables_personalizadas).length})
-                      </summary>
-                      <div className="px-3 pb-3 space-y-1.5">
-                        {Object.entries(auto.variables_personalizadas).map(([key, value]) => (
-                          <div key={key} className="text-xs font-mono bg-background px-2 py-1.5 rounded border flex items-center justify-between">
-                            <span className="text-primary font-semibold">{key}</span>
-                            <span className="text-muted-foreground">= {String(value)}</span>
+                    <Accordion type="single" collapsible>
+                      <AccordionItem value="vars" className="border rounded-lg">
+                        <AccordionTrigger className="px-3 py-2 hover:no-underline">
+                          <span className="flex items-center gap-2 text-sm">
+                            <Variable className="h-4 w-4" />
+                            Variables ({Object.keys(auto.variables_personalizadas).length})
+                          </span>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-3 pb-3">
+                          <div className="space-y-1.5">
+                            {Object.entries(auto.variables_personalizadas).map(([key, value]) => (
+                              <div key={key} className="flex items-center justify-between text-xs font-mono bg-muted/50 px-2 py-1.5 rounded">
+                                <span className="text-primary font-medium">{key}</span>
+                                <span className="text-muted-foreground truncate ml-2">{String(value)}</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    </details>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   )}
+                </div>
 
-                  {/* Acciones */}"
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => ejecutarManual(auto.id, auto.nombre_display)}
-                      className="h-11 md:h-12 active:scale-95 transition-transform"
-                    >
-                      <Play className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                      Ejecutar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => abrirDialogLogs(auto)}
-                      className="h-11 md:h-12 active:scale-95 transition-transform"
-                    >
-                      <Calendar className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                      Logs
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => abrirDialogEdit(auto)}
-                      className="h-11 md:h-12 active:scale-95 transition-transform"
-                    >
-                      <Edit className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => eliminarAutomatizacion(auto.id, auto.nombre_display)}
-                      className="h-11 md:h-12 text-destructive hover:text-destructive active:scale-95 transition-transform"
-                    >
-                      <Trash2 className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                      Eliminar
-                    </Button>
-                  </div>
+                <div className="p-4 pt-0 grid grid-cols-2 gap-2">
+                  <Button variant="default" size="sm" onClick={() => ejecutarManual(auto)} className="h-10">
+                    <Play className="h-4 w-4 mr-1" />Ejecutar
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => abrirDialogLogs(auto)} className="h-10">
+                    <History className="h-4 w-4 mr-1" />Historial
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => abrirDialogEdit(auto)} className="h-10">
+                    <Edit className="h-4 w-4 mr-1" />Editar
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => eliminarAutomatizacion(auto.id, auto.nombre_display)} className="h-10 text-destructive hover:text-destructive">
+                    <Trash2 className="h-4 w-4 mr-1" />Eliminar
+                  </Button>
                 </div>
               </Card>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Dialog Configurar */}
-      <Dialog open={dialogConfigOpen} onOpenChange={(open) => {
-        if (!open) closeDialog();
-        else setDialogConfigOpen(true);
-      }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* ==================== DIÁLOGOS ==================== */}
+
+      {/* Detalle de Script */}
+      <Dialog open={dialogDetailOpen} onOpenChange={setDialogDetailOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl flex items-center gap-2">
-              <Settings2 className="h-6 w-6 text-primary" />
-              Configurar Automatización
+            <DialogTitle className="flex items-center gap-2">
+              <FileCode className="h-5 w-5 text-primary" />
+              {scriptSeleccionado?.metadata?.nombre || scriptSeleccionado?.nombre_display}
             </DialogTitle>
+            <DialogDescription>{scriptSeleccionado?.script_path}</DialogDescription>
           </DialogHeader>
-          {scriptSeleccionado && (
-            <div className="space-y-5 py-2">
-              {/* Info del script */}
-              <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-4 border-2 border-primary/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-primary/20 rounded-lg">
-                    <FileCode className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-lg capitalize">{scriptSeleccionado.nombre_display}</h4>
-                    <code className="text-xs bg-background/50 px-2 py-1 rounded border">
-                      {scriptSeleccionado.script_path}
-                    </code>
-                  </div>
-                </div>
+
+          {scriptSeleccionado?.metadata && (
+            <div className="space-y-4 py-2">
+              <div>
+                <h4 className="text-sm font-medium mb-1">Descripción</h4>
+                <p className="text-sm text-muted-foreground">{scriptSeleccionado.metadata.descripcion}</p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="descripcion" className="text-base font-semibold flex items-center gap-2">
-                  <FileCode className="h-4 w-4" />
-                  Descripción
-                </Label>
-                <Textarea
-                  id="descripcion"
-                  value={formConfig.descripcion}
-                  onChange={(e) => setFormConfig({ ...formConfig, descripcion: e.target.value })}
-                  placeholder="Describe qué hace esta automatización"
-                  rows={3}
-                  className="text-base resize-none"
-                />
-              </div>
-
-              {/* Selector de horario */}
-              <div className="space-y-3">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  ¿Cuándo ejecutar?
-                </Label>
-                
-                {/* Tabs para selector visual o manual */}
-                <div className="flex gap-2 p-1 bg-muted rounded-lg">
-                  <Button
-                    type="button"
-                    variant={formConfig.cronMode === 'preset' ? 'default' : 'ghost'}
-                    className="flex-1 h-10"
-                    onClick={() => setFormConfig({ ...formConfig, cronMode: 'preset' })}
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Horarios Comunes
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formConfig.cronMode === 'custom' ? 'default' : 'ghost'}
-                    className="flex-1 h-10"
-                    onClick={() => setFormConfig({ ...formConfig, cronMode: 'custom' })}
-                  >
-                    <Settings2 className="h-4 w-4 mr-2" />
-                    Personalizado
-                  </Button>
-                </div>
-
-                {/* Selector visual de horarios */}
-                {formConfig.cronMode === 'preset' && (
-                  <div className="space-y-3">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
-                          Máximo 3 ejecuciones por día
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {HORARIOS_COMUNES.map((horario) => {
-                        const IconComponent = horario.icon;
-                        const isSelected = formConfig.cron_expresion === horario.cron;
-                        return (
-                          <Card
-                            key={horario.cron}
-                            className={`p-4 cursor-pointer transition-all hover:shadow-lg active:scale-95 ${
-                              isSelected 
-                                ? 'border-2 border-primary bg-primary/5 shadow-md' 
-                                : 'border hover:border-primary/50'
-                            }`}
-                            onClick={() => setFormConfig({ ...formConfig, cron_expresion: horario.cron })}
-                          >
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                <IconComponent className="h-5 w-5" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <h5 className="font-semibold text-sm">{horario.label}</h5>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-[10px] px-1.5 py-0 ${
-                                      horario.veces === 1 
-                                        ? 'border-green-300 text-green-700 dark:text-green-400' 
-                                        : horario.veces === 2 
-                                        ? 'border-blue-300 text-blue-700 dark:text-blue-400'
-                                        : 'border-yellow-300 text-yellow-700 dark:text-yellow-400'
-                                    }`}
-                                  >
-                                    {horario.veces}x/día
-                                  </Badge>
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate">{horario.desc}</p>
-                              </div>
+              {scriptSeleccionado.metadata.fases && scriptSeleccionado.metadata.fases.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Flujo del Proceso
+                  </h4>
+                  <div className="flex flex-col items-center py-2">
+                    {scriptSeleccionado.metadata.fases.map((fase, i) => {
+                      const Icon = getPhaseIcon(fase.id);
+                      return (
+                        <div key={fase.id} className="flex flex-col items-center">
+                          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 w-full">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                              <Icon className="h-4 w-4" />
                             </div>
-                            <code className="text-[10px] bg-muted px-2 py-1 rounded block text-center">
-                              {horario.cron}
-                            </code>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Input manual con time picker */}
-                {formConfig.cronMode === 'custom' && (
-                  <div className="space-y-3">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
-                          Máximo 3 ejecuciones por día
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Time Picker */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Selecciona la hora
-                      </Label>
-                      <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground mb-1.5 block">Hora</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="23"
-                            value={formConfig.customHour}
-                            onChange={(e) => {
-                              const hour = e.target.value.padStart(2, '0');
-                              setFormConfig({ 
-                                ...formConfig, 
-                                customHour: hour,
-                                cron_expresion: `0 ${hour} * * *`
-                              });
-                            }}
-                            className="text-center text-2xl font-bold h-16"
-                          />
+                            <div className="flex-1">
+                              <p className="font-medium text-sm">{fase.nombre}</p>
+                              {fase.descripcion && <p className="text-xs text-muted-foreground">{fase.descripcion}</p>}
+                            </div>
+                            <Badge variant="outline" className="text-[10px]">{fase.peso}%</Badge>
+                          </div>
+                          {i < scriptSeleccionado.metadata!.fases!.length - 1 && (
+                            <ArrowDown className="h-4 w-4 text-muted-foreground my-1" />
+                          )}
                         </div>
-                        <div className="text-3xl font-bold text-muted-foreground">:</div>
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground mb-1.5 block">Minuto</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="59"
-                            value={formConfig.customMinute}
-                            onChange={(e) => {
-                              const minute = e.target.value.padStart(2, '0');
-                              setFormConfig({ 
-                                ...formConfig, 
-                                customMinute: minute,
-                                cron_expresion: `${minute} ${formConfig.customHour} * * *`
-                              });
-                            }}
-                            className="text-center text-2xl font-bold h-16"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Preview */}
-                    <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-green-700 dark:text-green-300 font-medium">Se ejecutará:</p>
-                          <p className="text-base font-bold text-green-900 dark:text-green-100">
-                            Diario a las {formConfig.customHour}:{formConfig.customMinute}
-                          </p>
-                          <code className="text-[10px] bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded mt-1 inline-block">
-                            {formConfig.cron_expresion}
-                          </code>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Preview de interpretación */}
-                <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-green-700 dark:text-green-300 font-medium">Se ejecutará:</p>
-                      <p className="text-base font-bold text-green-900 dark:text-green-100">
-                        {interpretarCron(formConfig.cron_expresion)}
-                      </p>
-                    </div>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Variables personalizadas */}
-              <div className="space-y-2">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <Settings2 className="h-4 w-4" />
-                  Variables Personalizadas (Opcional)
-                </Label>
-                <CustomVariablesEditor
-                  variables={formConfig.variables_personalizadas}
-                  onChange={(vars) => setFormConfig({ ...formConfig, variables_personalizadas: vars })}
-                />
-              </div>
-
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg p-4">"
-                <div className="flex gap-3">
-                  <span className="text-2xl">⚠️</span>
-                  <div className="text-sm text-yellow-800 dark:text-yellow-200">
-                    <p className="font-medium mb-1">Importante</p>
-                    <p>La automatización se creará <strong>deshabilitada por defecto</strong>. Deberás activarla manualmente después de probarla.</p>
+              {scriptSeleccionado.metadata.variables_requeridas && scriptSeleccionado.metadata.variables_requeridas.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                    <Variable className="h-4 w-4" />Variables
+                  </h4>
+                  <div className="space-y-2">
+                    {scriptSeleccionado.metadata.variables_requeridas.map((v) => (
+                      <div key={v.nombre} className="p-3 rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-2 mb-1">
+                          <code className="text-sm font-medium text-primary">{v.nombre}</code>
+                          <Badge variant={v.requerida ? "outline" : "secondary"} className="text-[10px]">
+                            {v.requerida ? 'Requerida' : 'Opcional'}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{v.descripcion}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setDialogConfigOpen(false)}
-                  className="h-12 text-base order-2 sm:order-1"
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={configurarAutomatizacion}
-                  className="h-12 text-base order-1 sm:order-2 flex-1"
-                >
-                  <Zap className="h-5 w-5 mr-2" />
-                  Configurar Automatización
-                </Button>
-              </div>
+              <Button onClick={() => { setDialogDetailOpen(false); if (scriptSeleccionado) abrirDialogConfig(scriptSeleccionado); }} className="w-full h-11">
+                <Settings2 className="h-4 w-4 mr-2" />Configurar este script
+              </Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Logs */}
-      <Dialog open={dialogLogsOpen} onOpenChange={setDialogLogsOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+      {/* Configurar Script */}
+      <Dialog open={dialogConfigOpen} onOpenChange={setDialogConfigOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg md:text-xl">
-              Historial - {automatizacionSeleccionada?.nombre_display}
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 text-primary" />
+              Configurar Automatización
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 md:space-y-4">
+
+          {scriptSeleccionado && (
+            <Tabs defaultValue="schedule" className="w-full">
+              <TabsList className="w-full grid grid-cols-3">
+                <TabsTrigger value="schedule">Programación</TabsTrigger>
+                <TabsTrigger value="variables">Variables</TabsTrigger>
+                <TabsTrigger value="info">Información</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="schedule" className="space-y-4 mt-4">
+                <ScheduleConfigurator
+                  value={formConfig.cron_expresion}
+                  onChange={(cron) => setFormConfig({ ...formConfig, cron_expresion: cron })}
+                />
+              </TabsContent>
+
+              <TabsContent value="variables" className="space-y-4 mt-4">
+                <VariablesEditor
+                  variables={formConfig.variables_personalizadas}
+                  onChange={(vars) => setFormConfig({ ...formConfig, variables_personalizadas: vars })}
+                  requiredVariables={scriptSeleccionado.metadata?.variables_requeridas}
+                />
+              </TabsContent>
+
+              <TabsContent value="info" className="space-y-4 mt-4">
+                <div className="p-4 rounded-xl bg-primary/5 border-2 border-primary/20">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-primary/10 rounded-lg">
+                      <FileCode className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">{scriptSeleccionado.metadata?.nombre || scriptSeleccionado.nombre_display}</h4>
+                      <code className="text-xs text-muted-foreground">{scriptSeleccionado.script_path}</code>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="descripcion">Descripción</Label>
+                  <Textarea
+                    id="descripcion"
+                    value={formConfig.descripcion}
+                    onChange={(e) => setFormConfig({ ...formConfig, descripcion: e.target.value })}
+                    placeholder="Describe qué hace esta automatización"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex gap-2">
+                    <AlertCircle className="h-4 w-4 text-yellow-600 shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      La automatización se creará <strong>deshabilitada</strong>. Actívala manualmente después de verificar la configuración.
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <div className="flex gap-3 pt-4 border-t mt-4">
+                <Button variant="outline" onClick={() => setDialogConfigOpen(false)} className="flex-1 h-11">
+                  Cancelar
+                </Button>
+                <Button onClick={configurarAutomatizacion} className="flex-1 h-11">
+                  <Zap className="h-4 w-4 mr-2" />Configurar
+                </Button>
+              </div>
+            </Tabs>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Ejecución en Tiempo Real */}
+      <Dialog open={dialogExecutionOpen} onOpenChange={(open) => {
+        if (!open) {
+          setDialogExecutionOpen(false);
+          setCurrentExecutionId(null);
+          cargarAutomatizaciones();
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-primary" />
+              Monitor de Ejecución
+            </DialogTitle>
+          </DialogHeader>
+
+          {currentExecutionId && automatizacionSeleccionada && (
+            <ExecutionMonitor
+              executionId={currentExecutionId}
+              automatizacion={automatizacionSeleccionada}
+              phases={scriptsDisponibles.find(s => s.script_path === automatizacionSeleccionada.script_path)?.metadata?.fases}
+              onClose={() => {
+                setDialogExecutionOpen(false);
+                setCurrentExecutionId(null);
+                cargarAutomatizaciones();
+              }}
+              onCancel={() => {
+                setDialogExecutionOpen(false);
+                setCurrentExecutionId(null);
+                cargarAutomatizaciones();
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Historial de Logs */}
+      <Dialog open={dialogLogsOpen} onOpenChange={setDialogLogsOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              Historial de Ejecuciones
+            </DialogTitle>
+            <DialogDescription>{automatizacionSeleccionada?.nombre_display}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
             {logs.length === 0 ? (
               <div className="text-center py-12">
-                <Calendar className="h-16 w-16 mx-auto text-muted-foreground mb-3" />
+                <History className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
                 <p className="text-muted-foreground">No hay ejecuciones registradas</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {logs.map((log) => (
-                  <Card key={log.id} className="p-4">
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs md:text-sm text-muted-foreground mb-1">
-                            {new Date(log.fecha_inicio).toLocaleString('es-MX', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {getEstadoBadge(log.estado)}
-                            <Badge variant="outline" className="text-xs">
-                              <Clock className="h-3 w-3 mr-1" />
-                              {log.duracion_segundos}s
-                            </Badge>
-                          </div>
-                        </div>
+              logs.map((log) => (
+                <Card key={log.id} className="p-4">
+                  <div className="flex items-start justify-between gap-4 mb-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(log.fecha_inicio).toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {getEstadoBadge(log.estado)}
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Clock className="h-3 w-3" />{log.duracion_segundos}s
+                        </Badge>
                       </div>
-                      
-                      {log.error_mensaje && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                          <div className="text-xs font-medium text-red-900 dark:text-red-200 mb-1">Error:</div>
-                          <div className="text-xs text-red-800 dark:text-red-300 break-words">
-                            {log.error_mensaje}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {log.output && !log.error_mensaje && (
-                        <div className="bg-muted/50 rounded-lg p-3">
-                          <div className="text-xs text-muted-foreground break-words font-mono">
-                            {log.output}
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  </Card>
-                ))}
-              </div>
+                  </div>
+
+                  {log.error_mensaje && (
+                    <ErrorPanel error={log.error_mensaje} />
+                  )}
+
+                  {log.output && !log.error_mensaje && (
+                    <ScrollArea className="h-20 w-full rounded border bg-muted/30 p-2">
+                      <p className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">{log.output}</p>
+                    </ScrollArea>
+                  )}
+                </Card>
+              ))
             )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Editar */}
+      {/* Editar Automatización */}
       <Dialog open={dialogEditOpen} onOpenChange={setDialogEditOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl">Editar Automatización</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5 text-primary" />
+              Editar Automatización
+            </DialogTitle>
           </DialogHeader>
+
           {automatizacionSeleccionada && (
-            <div className="space-y-5 py-2">
-              <div className="bg-muted/50 rounded-lg p-4">
-                <h4 className="font-semibold text-lg capitalize mb-2">
-                  {automatizacionSeleccionada.nombre_display}
-                </h4>
-                <code className="text-xs bg-background px-2 py-1 rounded border">
-                  {automatizacionSeleccionada.script_path}
-                </code>
-              </div>
+            <Tabs defaultValue="schedule" className="w-full">
+              <TabsList className="w-full grid grid-cols-3">
+                <TabsTrigger value="schedule">Programación</TabsTrigger>
+                <TabsTrigger value="variables">Variables</TabsTrigger>
+                <TabsTrigger value="info">Información</TabsTrigger>
+              </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit-descripcion" className="text-base font-semibold">Descripción</Label>
-                <Textarea
-                  id="edit-descripcion"
-                  value={formEdit.descripcion}
-                  onChange={(e) => setFormEdit({ ...formEdit, descripcion: e.target.value })}
-                  rows={3}
-                  className="text-base resize-none"
+              <TabsContent value="schedule" className="space-y-4 mt-4">
+                <ScheduleConfigurator
+                  value={formEdit.cron_expresion}
+                  onChange={(cron) => setFormEdit({ ...formEdit, cron_expresion: cron })}
                 />
-              </div>
+              </TabsContent>
 
-              {/* Selector de horario para edición */}
-              <div className="space-y-3">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  ¿Cuándo ejecutar?
-                </Label>
-                
-                <div className="flex gap-2 p-1 bg-muted rounded-lg">
-                  <Button
-                    type="button"
-                    variant={formEdit.cronMode === 'preset' ? 'default' : 'ghost'}
-                    className="flex-1 h-10"
-                    onClick={() => setFormEdit({ ...formEdit, cronMode: 'preset' })}
-                  >
-                    <Zap className="h-4 w-4 mr-2" />
-                    Horarios Comunes
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formEdit.cronMode === 'custom' ? 'default' : 'ghost'}
-                    className="flex-1 h-10"
-                    onClick={() => setFormEdit({ ...formEdit, cronMode: 'custom' })}
-                  >
-                    <Settings2 className="h-4 w-4 mr-2" />
-                    Personalizado
-                  </Button>
-                </div>
-
-                {/* Selector visual */}
-                {formEdit.cronMode === 'preset' && (
-                  <div className="space-y-3">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
-                          Máximo 3 ejecuciones por día
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {HORARIOS_COMUNES.map((horario) => {
-                        const IconComponent = horario.icon;
-                        const isSelected = formEdit.cron_expresion === horario.cron;
-                        return (
-                          <Card
-                            key={horario.cron}
-                            className={`p-4 cursor-pointer transition-all hover:shadow-lg active:scale-95 ${
-                              isSelected 
-                                ? 'border-2 border-primary bg-primary/5 shadow-md' 
-                                : 'border hover:border-primary/50'
-                            }`}
-                            onClick={() => setFormEdit({ ...formEdit, cron_expresion: horario.cron })}
-                          >
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`p-2 rounded-lg ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                <IconComponent className="h-5 w-5" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <h5 className="font-semibold text-sm">{horario.label}</h5>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={`text-[10px] px-1.5 py-0 ${
-                                      horario.veces === 1 
-                                        ? 'border-green-300 text-green-700 dark:text-green-400' 
-                                        : horario.veces === 2 
-                                        ? 'border-blue-300 text-blue-700 dark:text-blue-400'
-                                        : 'border-yellow-300 text-yellow-700 dark:text-yellow-400'
-                                    }`}
-                                  >
-                                    {horario.veces}x/día
-                                  </Badge>
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate">{horario.desc}</p>
-                              </div>
-                            </div>
-                            <code className="text-[10px] bg-muted px-2 py-1 rounded block text-center">
-                              {horario.cron}
-                            </code>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Time Picker */}
-                {formEdit.cronMode === 'custom' && (
-                  <div className="space-y-3">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        <p className="text-xs font-medium text-blue-900 dark:text-blue-200">
-                          Máximo 3 ejecuciones por día
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Selecciona la hora
-                      </Label>
-                      <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-800">
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground mb-1.5 block">Hora</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="23"
-                            value={formEdit.customHour}
-                            onChange={(e) => {
-                              const hour = e.target.value.padStart(2, '0');
-                              setFormEdit({ 
-                                ...formEdit, 
-                                customHour: hour,
-                                cron_expresion: `0 ${hour} * * *`
-                              });
-                            }}
-                            className="text-center text-2xl font-bold h-16"
-                          />
-                        </div>
-                        <div className="text-3xl font-bold text-muted-foreground">:</div>
-                        <div className="flex-1">
-                          <Label className="text-xs text-muted-foreground mb-1.5 block">Minuto</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="59"
-                            value={formEdit.customMinute}
-                            onChange={(e) => {
-                              const minute = e.target.value.padStart(2, '0');
-                              setFormEdit({ 
-                                ...formEdit, 
-                                customMinute: minute,
-                                cron_expresion: `${minute} ${formEdit.customHour} * * *`
-                              });
-                            }}
-                            className="text-center text-2xl font-bold h-16"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-green-700 dark:text-green-300 font-medium">Se ejecutará:</p>
-                          <p className="text-base font-bold text-green-900 dark:text-green-100">
-                            Diario a las {formEdit.customHour}:{formEdit.customMinute}
-                          </p>
-                          <code className="text-[10px] bg-green-100 dark:bg-green-900 px-2 py-0.5 rounded mt-1 inline-block">
-                            {formEdit.cron_expresion}
-                          </code>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Preview de interpretación */}
-                {formEdit.cronMode === 'preset' && (
-                  <div className="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-green-700 dark:text-green-300 font-medium">Se ejecutará:</p>
-                        <p className="text-base font-bold text-green-900 dark:text-green-100">
-                          {interpretarCron(formEdit.cron_expresion)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Variables personalizadas */}
-              <div className="space-y-2">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <Settings2 className="h-4 w-4" />
-                  Variables Personalizadas (Opcional)
-                </Label>
-                <CustomVariablesEditor
+              <TabsContent value="variables" className="space-y-4 mt-4">
+                <VariablesEditor
                   variables={formEdit.variables_personalizadas}
                   onChange={(vars) => setFormEdit({ ...formEdit, variables_personalizadas: vars })}
+                  requiredVariables={scriptsDisponibles.find(s => s.script_path === automatizacionSeleccionada.script_path)?.metadata?.variables_requeridas}
                 />
-              </div>
+              </TabsContent>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">"
-                <Button 
-                  variant="outline" 
-                  onClick={() => setDialogEditOpen(false)}
-                  className="h-12 text-base order-2 sm:order-1"
-                >
+              <TabsContent value="info" className="space-y-4 mt-4">
+                <div className="p-4 rounded-xl bg-muted/50">
+                  <h4 className="font-semibold capitalize">{automatizacionSeleccionada.nombre_display}</h4>
+                  <code className="text-xs text-muted-foreground">{automatizacionSeleccionada.script_path}</code>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-descripcion">Descripción</Label>
+                  <Textarea
+                    id="edit-descripcion"
+                    value={formEdit.descripcion}
+                    onChange={(e) => setFormEdit({ ...formEdit, descripcion: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+              </TabsContent>
+
+              <div className="flex gap-3 pt-4 border-t mt-4">
+                <Button variant="outline" onClick={() => setDialogEditOpen(false)} className="flex-1 h-11">
                   Cancelar
                 </Button>
-                <Button 
-                  onClick={editarAutomatizacion}
-                  className="h-12 text-base order-1 sm:order-2 flex-1"
-                >
+                <Button onClick={editarAutomatizacion} className="flex-1 h-11">
                   Guardar Cambios
                 </Button>
               </div>
-            </div>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>

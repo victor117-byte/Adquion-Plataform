@@ -108,6 +108,187 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+}
+
+/* ========================================
+   TEMAS DE COLOR - Modo Claro (Light)
+   Los temas se aplican sobre :root.light o :root sin .dark
+   ======================================== */
+
+/* TEMA ESMERALDA (Emerald) - Light */
+:root.theme-emerald.light,
+:root.theme-emerald:not(.dark) {
+  --primary: 160 84% 39%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 160 84% 34%;
+  --primary-glow: 160 84% 50%;
+  --accent: 168 76% 42%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 160 84% 39%;
+  --gradient-primary: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(168 76% 42%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(168 76% 42%) 50%, hsl(142 71% 45%) 100%);
+  --shadow-glow: 0 0 60px hsl(160 84% 39% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(160 84% 39% / 0.4);
+  --sidebar-primary: 160 84% 39%;
+  --sidebar-ring: 160 84% 39%;
+}
+
+/* TEMA ESMERALDA (Emerald) - Dark */
+:root.theme-emerald.dark {
+  --primary: 160 84% 45%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 160 84% 40%;
+  --primary-glow: 160 84% 55%;
+  --accent: 168 76% 48%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 160 84% 45%;
+  --gradient-primary: linear-gradient(135deg, hsl(160 84% 45%) 0%, hsl(168 76% 48%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(160 84% 45%) 0%, hsl(168 76% 48%) 50%, hsl(142 71% 50%) 100%);
+  --shadow-glow: 0 0 60px hsl(160 84% 45% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(160 84% 45% / 0.4);
+  --sidebar-primary: 160 84% 45%;
+  --sidebar-ring: 160 84% 45%;
+}
+
+/* TEMA ROSA (Rose) - Light */
+:root.theme-rose.light,
+:root.theme-rose:not(.dark) {
+  --primary: 350 89% 60%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 350 89% 55%;
+  --primary-glow: 350 89% 70%;
+  --accent: 330 81% 60%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 350 89% 60%;
+  --gradient-primary: linear-gradient(135deg, hsl(350 89% 60%) 0%, hsl(330 81% 60%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(350 89% 60%) 0%, hsl(330 81% 60%) 50%, hsl(280 87% 65%) 100%);
+  --shadow-glow: 0 0 60px hsl(350 89% 60% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(350 89% 60% / 0.4);
+  --sidebar-primary: 350 89% 60%;
+  --sidebar-ring: 350 89% 60%;
+}
+
+/* TEMA ROSA (Rose) - Dark */
+:root.theme-rose.dark {
+  --primary: 350 89% 65%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 350 89% 60%;
+  --primary-glow: 350 89% 75%;
+  --accent: 330 81% 65%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 350 89% 65%;
+  --gradient-primary: linear-gradient(135deg, hsl(350 89% 65%) 0%, hsl(330 81% 65%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(350 89% 65%) 0%, hsl(330 81% 65%) 50%, hsl(280 87% 70%) 100%);
+  --shadow-glow: 0 0 60px hsl(350 89% 65% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(350 89% 65% / 0.4);
+  --sidebar-primary: 350 89% 65%;
+  --sidebar-ring: 350 89% 65%;
+}
+
+/* TEMA ÁMBAR (Amber) - Light */
+:root.theme-amber.light,
+:root.theme-amber:not(.dark) {
+  --primary: 38 92% 50%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 38 92% 45%;
+  --primary-glow: 38 92% 60%;
+  --accent: 25 95% 53%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 38 92% 50%;
+  --gradient-primary: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(25 95% 53%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(25 95% 53%) 50%, hsl(0 84% 60%) 100%);
+  --shadow-glow: 0 0 60px hsl(38 92% 50% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(38 92% 50% / 0.4);
+  --sidebar-primary: 38 92% 50%;
+  --sidebar-ring: 38 92% 50%;
+}
+
+/* TEMA ÁMBAR (Amber) - Dark */
+:root.theme-amber.dark {
+  --primary: 38 92% 55%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 38 92% 50%;
+  --primary-glow: 38 92% 65%;
+  --accent: 25 95% 58%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 38 92% 55%;
+  --gradient-primary: linear-gradient(135deg, hsl(38 92% 55%) 0%, hsl(25 95% 58%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(38 92% 55%) 0%, hsl(25 95% 58%) 50%, hsl(0 84% 65%) 100%);
+  --shadow-glow: 0 0 60px hsl(38 92% 55% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(38 92% 55% / 0.4);
+  --sidebar-primary: 38 92% 55%;
+  --sidebar-ring: 38 92% 55%;
+}
+
+/* TEMA VIOLETA (Violet) - Light */
+:root.theme-violet.light,
+:root.theme-violet:not(.dark) {
+  --primary: 262 83% 58%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 262 83% 53%;
+  --primary-glow: 262 83% 68%;
+  --accent: 280 87% 65%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 262 83% 58%;
+  --gradient-primary: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(280 87% 65%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(262 83% 58%) 0%, hsl(280 87% 65%) 50%, hsl(300 76% 60%) 100%);
+  --shadow-glow: 0 0 60px hsl(262 83% 58% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(262 83% 58% / 0.4);
+  --sidebar-primary: 262 83% 58%;
+  --sidebar-ring: 262 83% 58%;
+}
+
+/* TEMA VIOLETA (Violet) - Dark */
+:root.theme-violet.dark {
+  --primary: 262 83% 63%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 262 83% 58%;
+  --primary-glow: 262 83% 73%;
+  --accent: 280 87% 70%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 262 83% 63%;
+  --gradient-primary: linear-gradient(135deg, hsl(262 83% 63%) 0%, hsl(280 87% 70%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(262 83% 63%) 0%, hsl(280 87% 70%) 50%, hsl(300 76% 65%) 100%);
+  --shadow-glow: 0 0 60px hsl(262 83% 63% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(262 83% 63% / 0.4);
+  --sidebar-primary: 262 83% 63%;
+  --sidebar-ring: 262 83% 63%;
+}
+
+/* TEMA PIZARRA (Slate) - Light */
+:root.theme-slate.light,
+:root.theme-slate:not(.dark) {
+  --primary: 215 16% 47%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 215 16% 42%;
+  --primary-glow: 215 16% 57%;
+  --accent: 215 19% 35%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 215 16% 47%;
+  --gradient-primary: linear-gradient(135deg, hsl(215 16% 47%) 0%, hsl(215 19% 35%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(215 16% 47%) 0%, hsl(215 19% 35%) 50%, hsl(220 13% 26%) 100%);
+  --shadow-glow: 0 0 60px hsl(215 16% 47% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(215 16% 47% / 0.4);
+  --sidebar-primary: 215 16% 47%;
+  --sidebar-ring: 215 16% 47%;
+}
+
+/* TEMA PIZARRA (Slate) - Dark */
+:root.theme-slate.dark {
+  --primary: 215 16% 55%;
+  --primary-foreground: 0 0% 100%;
+  --primary-hover: 215 16% 50%;
+  --primary-glow: 215 16% 65%;
+  --accent: 215 19% 45%;
+  --accent-foreground: 0 0% 100%;
+  --ring: 215 16% 55%;
+  --gradient-primary: linear-gradient(135deg, hsl(215 16% 55%) 0%, hsl(215 19% 45%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(215 16% 55%) 0%, hsl(215 19% 45%) 50%, hsl(220 13% 35%) 100%);
+  --shadow-glow: 0 0 60px hsl(215 16% 55% / 0.4);
+  --shadow-elegant: 0 10px 40px -10px hsl(215 16% 55% / 0.4);
+  --sidebar-primary: 215 16% 55%;
+  --sidebar-ring: 215 16% 55%;
 }
 
 @layer base {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, BarChart3, Save } from "lucide-react";
+import { Plus, Edit, Trash2, BarChart3, Save, Palette, Sun, Moon, Monitor, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme, type ColorTheme, type AppearanceMode } from "@/contexts/ThemeContext";
 
 interface Reporte {
   id: number;
@@ -64,6 +65,7 @@ const getHeaders = () => ({
 
 export function SettingsSection() {
   const { user: currentUser } = useAuth();
+  const { colorTheme, appearanceMode, resolvedMode, setColorTheme, setAppearanceMode, availableThemes } = useTheme();
   const [reportes, setReportes] = useState<Reporte[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -320,14 +322,138 @@ export function SettingsSection() {
         </p>
       </div>
 
-      <Tabs defaultValue="reportes" className="w-full">
+      <Tabs defaultValue="apariencia" className="w-full">
         <TabsList>
+          <TabsTrigger value="apariencia">
+            <Palette className="h-4 w-4 mr-2" />
+            Apariencia
+          </TabsTrigger>
           <TabsTrigger value="reportes">
             <BarChart3 className="h-4 w-4 mr-2" />
             Reportes Embebidos
           </TabsTrigger>
-          {/* Aquí puedes agregar más tabs en el futuro */}
         </TabsList>
+
+        <TabsContent value="apariencia" className="space-y-6">
+          {/* Modo de Apariencia */}
+          <Card className="p-6">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold">Modo de Apariencia</h3>
+              <p className="text-sm text-muted-foreground">
+                Elige entre modo claro, oscuro o sigue la configuración del sistema
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <button
+                onClick={() => setAppearanceMode('light')}
+                className={`relative flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                  appearanceMode === 'light'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Sun className="h-6 w-6 text-amber-600" />
+                </div>
+                <span className="font-medium">Claro</span>
+                {appearanceMode === 'light' && (
+                  <div className="absolute top-2 right-2">
+                    <Check className="h-5 w-5 text-primary" />
+                  </div>
+                )}
+              </button>
+
+              <button
+                onClick={() => setAppearanceMode('dark')}
+                className={`relative flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                  appearanceMode === 'dark'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center">
+                  <Moon className="h-6 w-6 text-slate-200" />
+                </div>
+                <span className="font-medium">Oscuro</span>
+                {appearanceMode === 'dark' && (
+                  <div className="absolute top-2 right-2">
+                    <Check className="h-5 w-5 text-primary" />
+                  </div>
+                )}
+              </button>
+
+              <button
+                onClick={() => setAppearanceMode('system')}
+                className={`relative flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-all hover:border-primary/50 ${
+                  appearanceMode === 'system'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border'
+                }`}
+              >
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-100 to-slate-800 flex items-center justify-center">
+                  <Monitor className="h-6 w-6 text-slate-600" />
+                </div>
+                <span className="font-medium">Sistema</span>
+                {appearanceMode === 'system' && (
+                  <div className="absolute top-2 right-2">
+                    <Check className="h-5 w-5 text-primary" />
+                  </div>
+                )}
+              </button>
+            </div>
+            {appearanceMode === 'system' && (
+              <p className="text-xs text-muted-foreground mt-4 text-center">
+                Actualmente usando modo: <span className="font-medium">{resolvedMode === 'dark' ? 'Oscuro' : 'Claro'}</span>
+              </p>
+            )}
+          </Card>
+
+          {/* Tema de Color */}
+          <Card className="p-6">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold">Tema de Color</h3>
+              <p className="text-sm text-muted-foreground">
+                Personaliza el color principal de la aplicación
+              </p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {availableThemes.map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => {
+                    setColorTheme(theme.id as ColorTheme);
+                    toast({
+                      title: "Tema actualizado",
+                      description: `Se ha aplicado el tema "${theme.name}"`,
+                    });
+                  }}
+                  className={`relative flex flex-col items-start gap-3 p-4 rounded-lg border-2 transition-all hover:border-primary/50 text-left ${
+                    colorTheme === theme.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-8 h-8 rounded-full"
+                      style={{
+                        background: `linear-gradient(135deg, ${theme.preview.primary} 0%, ${theme.preview.secondary} 100%)`
+                      }}
+                    />
+                    <span className="font-medium">{theme.name}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{theme.description}</p>
+                  {colorTheme === theme.id && (
+                    <div className="absolute top-2 right-2">
+                      <Check className="h-5 w-5 text-primary" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+        </TabsContent>
 
         <TabsContent value="reportes" className="space-y-4">
           <Card className="p-4">
