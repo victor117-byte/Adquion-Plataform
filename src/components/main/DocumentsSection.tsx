@@ -483,12 +483,7 @@ export function DocumentsSection() {
       const result = await response.json();
 
       if (result.success) {
-        // Filtrar documentos que no sean de automatización ni de la carpeta dev/
-        const docs = (result.data?.documentos || []).filter(doc =>
-          !doc.ruta_archivo?.includes('/dev/') &&
-          !doc.nombre_original?.toLowerCase().includes('automatizacion')
-        );
-        setDocumentos(docs);
+        setDocumentos(result.data?.documentos || []);
         setPagination(result.data?.pagination || null);
       } else {
         throw new Error(result.error || 'Error al cargar documentos');

@@ -27,6 +27,7 @@ import { AutomationsSection } from "@/components/main/AutomationsSection";
 import { NotificationsSection } from "@/components/main/NotificationsSection";
 import { PowerBISection } from "@/components/main/PowerBISection";
 import { SettingsSection } from "@/components/main/SettingsSection";
+import { FeedbackButton } from "@/components/FeedbackButton";
 
 type SectionType = 'dashboard' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications' | 'powerbi' | 'settings';
 
@@ -230,10 +231,6 @@ export default function Main() {
               <Badge className="mt-1" variant={user.tipo_usuario === 'administrador' ? 'default' : 'secondary'}>
                 {user.tipo_usuario}
               </Badge>
-              <div className="mt-2 pt-2 border-t border-border">
-                <p className="text-xs text-muted-foreground">Organización:</p>
-                <p className="text-sm font-medium truncate">{user.organizacion}</p>
-              </div>
             </div>
           )}
           <Button 
@@ -261,6 +258,9 @@ export default function Main() {
           {renderSection()}
         </div>
       </main>
+
+      {/* Botón de feedback flotante */}
+      <FeedbackButton />
     </div>
   );
 }
