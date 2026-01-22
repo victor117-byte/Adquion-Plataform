@@ -335,7 +335,8 @@ Este proyecto es **propietario**. Todos los derechos reservados.
 
 ---
 
-**Desarrollado con excelencia y pasión para la gestión fiscal profesional**
+
+**Desarrollado con excelencia y pasión para la gestión fiscal profesional. (Prueba de despliegue automático)**
 
 🌐 **Website**: [fiscalnexuspro.com](https://fiscalnexuspro.com)
 📧 **Email**: soporte@fiscalnexuspro.com
