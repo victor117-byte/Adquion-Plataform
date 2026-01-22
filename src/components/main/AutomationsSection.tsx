@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Play, Calendar, CheckCircle, XCircle, Clock, Edit, Trash2,
-  Settings2, FileCode, TrendingUp, Sun, Moon, Timer, Zap,
+  Settings2, FileCode, TrendingUp, Sun, Zap,
   AlertCircle, Loader2, StopCircle, Info, Database, Upload,
-  ListChecks, Variable, Plus, X, Eye, ArrowRight, RefreshCw,
-  ChevronRight, RotateCcw, Lightbulb, MessageSquare, Activity,
-  Circle, ArrowDown, PlayCircle, PauseCircle, History, Cpu
+  Variable, Plus, X, Eye, RefreshCw,
+  RotateCcw, Lightbulb, MessageSquare, Activity,
+  Circle, ArrowDown, PlayCircle, History, Cpu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
@@ -86,11 +86,16 @@ interface Automatizacion {
   cron_expresion: string;
   activo: boolean;
   ultima_ejecucion: string | null;
-  ultima_estado: 'exitoso' | 'error' | null;
-  total_ejecuciones: string;
-  ejecuciones_exitosas: string;
-  ejecuciones_error: string;
+  ultima_estado: 'exitoso' | 'error' | 'advertencia' | 'en_ejecucion' | null;
+  total_ejecuciones: number | string;
+  ejecuciones_exitosas: number | string;
+  ejecuciones_error: number | string;
   variables_personalizadas?: Record<string, string | number | boolean>;
+  creado_por?: number;
+  creado_por_nombre?: string;
+  creado_por_correo?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface PhaseState {
@@ -132,12 +137,15 @@ interface ExecutionStatus {
 
 interface LogEjecucion {
   id: number;
-  estado: 'exitoso' | 'error';
+  estado: 'exitoso' | 'error' | 'advertencia' | 'en_ejecucion';
   fecha_inicio: string;
-  fecha_fin: string;
-  duracion_segundos: number;
-  output: string;
+  fecha_fin: string | null;
+  duracion_segundos: number | null;
+  output: string | null;
   error_mensaje: string | null;
+  ejecutado_por?: string;
+  ejecutado_por_correo?: string;
+  es_programado?: boolean;
 }
 
 // ==================== CONSTANTES ====================
@@ -146,6 +154,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const getHeaders = () => ({
   'Content-Type': 'application/json',
+  'ngrok-skip-browser-warning': 'true',
 });
 
 // Modos de programación
@@ -244,47 +253,65 @@ const validarCron = (cron: string): { valido: boolean; mensaje: string } => {
 
 const interpretarCron = (cron: string): string => {
   if (cron === 'manual') return 'Ejecución manual';
+  // Cron imposible usado para "manual" en backend
+  if (cron === '0 0 31 2 *') return 'Ejecución manual';
 
-  const ejemplos: Record<string, string> = {
-    '0 8,16 * * *': 'Diario a las 8:00am y 4:00pm',
-    '0 7,15 * * *': 'Diario a las 7:00am y 3:00pm',
-    '0 21 * * *': 'Diario a las 9:00pm',
-    '0 */12 * * *': 'Cada 12 horas',
-    '0 * * * *': 'Cada hora',
-    '0 */8 * * *': 'Cada 8 horas',
-    '0 2 * * *': 'Diario a las 2:00am',
-    '0 9 * * *': 'Diario a las 9:00am',
-    '0 18 * * *': 'Diario a las 6:00pm',
-    '0 0 * * *': 'Diario a medianoche',
-    '0 12 * * *': 'Diario a las 12:00pm',
+  const parts = cron.split(' ');
+  if (parts.length !== 5) return cron;
+
+  const [min, hour, dayOfMonth, month, dayOfWeek] = parts;
+
+  // Formatear hora
+  const formatHour = (h: string, m: string) => {
+    const hourNum = parseInt(h);
+    const minStr = m.padStart(2, '0');
+    if (hourNum === 0) return `12:${minStr} AM`;
+    if (hourNum === 12) return `12:${minStr} PM`;
+    if (hourNum < 12) return `${hourNum}:${minStr} AM`;
+    return `${hourNum - 12}:${minStr} PM`;
   };
 
-  if (ejemplos[cron]) return ejemplos[cron];
-
-  // Intentar interpretar cron básico
-  const parts = cron.split(' ');
-  if (parts.length === 5) {
-    const [min, hour, , , dayOfWeek] = parts;
-
-    if (dayOfWeek !== '*') {
-      const days = dayOfWeek.split(',').map(d => WEEKDAYS.find(w => w.value === d)?.label).filter(Boolean);
-      return `${days.join(', ')} a las ${hour}:${min.padStart(2, '0')}`;
-    }
-
-    if (hour.includes('/')) {
-      const interval = hour.split('/')[1];
-      return `Cada ${interval} horas`;
-    }
-
-    if (hour.includes(',')) {
-      const hours = hour.split(',').map(h => `${h}:00`);
-      return `Diario a las ${hours.join(' y ')}`;
-    }
-
-    return `Diario a las ${hour}:${min.padStart(2, '0')}`;
+  // Cada X minutos
+  if (min.startsWith('*/')) {
+    return `Cada ${min.slice(2)} minutos`;
   }
 
-  return 'Programación personalizada';
+  // Cada X horas
+  if (hour.startsWith('*/')) {
+    return `Cada ${hour.slice(2)} horas`;
+  }
+
+  // Días específicos de la semana
+  if (dayOfWeek !== '*' && dayOfMonth === '*' && month === '*') {
+    const dayNames = dayOfWeek.split(',').map(d => {
+      if (d === '1-5') return 'Lun-Vie';
+      return WEEKDAYS.find(w => w.value === d)?.label || d;
+    });
+
+    if (dayOfWeek === '1-5') {
+      return `Lun-Vie a las ${formatHour(hour, min)}`;
+    }
+
+    return `${dayNames.join(', ')} a las ${formatHour(hour, min)}`;
+  }
+
+  // Primer día de cada mes
+  if (dayOfMonth === '1' && month === '*' && dayOfWeek === '*') {
+    return `Primer día de cada mes a las ${formatHour(hour, min)}`;
+  }
+
+  // Múltiples horas en el día
+  if (hour.includes(',') && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    const hours = hour.split(',').map(h => formatHour(h, min));
+    return `Diario a las ${hours.join(' y ')}`;
+  }
+
+  // Diario a una hora específica
+  if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    return `Diario a las ${formatHour(hour, min)}`;
+  }
+
+  return `Cron: ${cron}`;
 };
 
 const generateCronFromSchedule = (
@@ -424,100 +451,6 @@ function FlowDiagram({
         );
       })}
     </div>
-  );
-}
-
-// Panel de detalle de fase
-function PhaseDetailPanel({
-  phase,
-  state,
-  onClose
-}: {
-  phase: ScriptFase;
-  state: PhaseState;
-  onClose: () => void;
-}) {
-  const statusLabels = {
-    pending: { label: 'Pendiente', color: 'bg-gray-100 text-gray-700' },
-    running: { label: 'En ejecución', color: 'bg-blue-100 text-blue-700' },
-    completed: { label: 'Completado', color: 'bg-green-100 text-green-700' },
-    error: { label: 'Error', color: 'bg-red-100 text-red-700' },
-  };
-
-  const { label, color } = statusLabels[state.status];
-
-  return (
-    <Card className="border-l-4 border-l-primary">
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2">
-              {getPhaseIcon(phase.id)({ className: "h-5 w-5" })}
-              {phase.nombre}
-            </CardTitle>
-            {phase.descripcion && (
-              <CardDescription className="mt-1">{phase.descripcion}</CardDescription>
-            )}
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Estado */}
-        <div className="flex items-center gap-3">
-          <Badge className={color}>{label}</Badge>
-          {state.progress !== undefined && state.status === 'running' && (
-            <div className="flex-1">
-              <Progress value={state.progress} className="h-2" />
-            </div>
-          )}
-        </div>
-
-        {/* Tiempos */}
-        {(state.started_at || state.completed_at) && (
-          <div className="text-xs text-muted-foreground space-y-1">
-            {state.started_at && (
-              <p>Inicio: {new Date(state.started_at).toLocaleTimeString('es-MX')}</p>
-            )}
-            {state.completed_at && (
-              <p>Fin: {new Date(state.completed_at).toLocaleTimeString('es-MX')}</p>
-            )}
-          </div>
-        )}
-
-        {/* Logs de la fase */}
-        {state.logs && state.logs.length > 0 && (
-          <div>
-            <p className="text-xs font-medium mb-2 flex items-center gap-1">
-              <MessageSquare className="h-3 w-3" />
-              Mensajes
-            </p>
-            <ScrollArea className="h-32 rounded border bg-muted/30 p-2">
-              <div className="space-y-1">
-                {state.logs.map((log, i) => (
-                  <div key={i} className={`text-xs font-mono ${
-                    log.level === 'error' ? 'text-red-600' :
-                    log.level === 'warning' ? 'text-yellow-600' :
-                    'text-muted-foreground'
-                  }`}>
-                    <span className="opacity-50">
-                      {new Date(log.timestamp).toLocaleTimeString('es-MX', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit'
-                      })}
-                    </span>
-                    {' '}{log.message}
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -1509,20 +1442,36 @@ export function AutomationsSection() {
 
   // ==================== RENDERS ====================
 
-  const getEstadoBadge = (estado: 'exitoso' | 'error' | null) => {
+  const getEstadoBadge = (estado: 'exitoso' | 'error' | 'advertencia' | 'en_ejecucion' | null) => {
     if (!estado) return <Badge variant="secondary">Sin ejecuciones</Badge>;
-    if (estado === 'exitoso') {
-      return (
-        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200">
-          <CheckCircle className="h-3 w-3 mr-1" />Exitoso
-        </Badge>
-      );
+
+    switch (estado) {
+      case 'exitoso':
+        return (
+          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200">
+            <CheckCircle className="h-3 w-3 mr-1" />Exitoso
+          </Badge>
+        );
+      case 'advertencia':
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-200">
+            <AlertCircle className="h-3 w-3 mr-1" />Con advertencias
+          </Badge>
+        );
+      case 'en_ejecucion':
+        return (
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200">
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />En ejecución
+          </Badge>
+        );
+      case 'error':
+      default:
+        return (
+          <Badge className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">
+            <XCircle className="h-3 w-3 mr-1" />Error
+          </Badge>
+        );
     }
-    return (
-      <Badge className="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">
-        <XCircle className="h-3 w-3 mr-1" />Error
-      </Badge>
-    );
   };
 
   if (loading) {
@@ -1990,16 +1939,26 @@ export function AutomationsSection() {
               logs.map((log) => (
                 <Card key={log.id} className="p-4">
                   <div className="flex items-start justify-between gap-4 mb-3">
-                    <div>
+                    <div className="flex-1">
                       <p className="text-sm text-muted-foreground">
                         {new Date(log.fecha_inicio).toLocaleString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
                         {getEstadoBadge(log.estado)}
-                        <Badge variant="outline" className="text-xs gap-1">
-                          <Clock className="h-3 w-3" />{log.duracion_segundos}s
-                        </Badge>
+                        {log.duracion_segundos != null && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Clock className="h-3 w-3" />{log.duracion_segundos}s
+                          </Badge>
+                        )}
+                        {log.es_programado === false && (
+                          <Badge variant="secondary" className="text-xs">Manual</Badge>
+                        )}
                       </div>
+                      {log.ejecutado_por && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Por: {log.ejecutado_por}
+                        </p>
+                      )}
                     </div>
                   </div>
 
