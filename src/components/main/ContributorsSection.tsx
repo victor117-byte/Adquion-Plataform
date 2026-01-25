@@ -88,8 +88,8 @@ interface Contribuyente {
   contrasena_firma: string | null;
   cuenta_rtp: string | null;
   contrasena_rtp: string | null;
-  cuenta_isr: string | null;
-  contrasena_isr: string | null;
+  cuenta_isn: string | null;
+  contrasena_isn: string | null;
   cuenta_sipare: string | null;
   contrasena_sipare: string | null;
   usuario_asignado_id: number;
@@ -791,12 +791,12 @@ function ContribuyenteDetailDialog({
                       {renderPassword(contribuyente.contrasena_rtp, 'rtp')}
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Cuenta ISR</p>
-                      <p className="text-sm">{contribuyente.cuenta_isr || <span className="text-muted-foreground italic">No configurada</span>}</p>
+                      <p className="text-xs text-muted-foreground mb-1">Cuenta ISN</p>
+                      <p className="text-sm">{contribuyente.cuenta_isn || <span className="text-muted-foreground italic">No configurada</span>}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Contraseña ISR</p>
-                      {renderPassword(contribuyente.contrasena_isr, 'isr')}
+                      <p className="text-xs text-muted-foreground mb-1">Contraseña ISN</p>
+                      {renderPassword(contribuyente.contrasena_isn, 'isn')}
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Cuenta SIPARE</p>
@@ -915,8 +915,8 @@ function ContribuyenteFormWizard({
     contrasena_firma: '',
     cuenta_rtp: '',
     contrasena_rtp: '',
-    cuenta_isr: '',
-    contrasena_isr: '',
+    cuenta_isn: '',
+    contrasena_isn: '',
     cuenta_sipare: '',
     contrasena_sipare: '',
     estado: 'activo' as EstadoContribuyente,
@@ -940,8 +940,8 @@ function ContribuyenteFormWizard({
         contrasena_firma: editingContributor.contrasena_firma || '',
         cuenta_rtp: editingContributor.cuenta_rtp || '',
         contrasena_rtp: editingContributor.contrasena_rtp || '',
-        cuenta_isr: editingContributor.cuenta_isr || '',
-        contrasena_isr: editingContributor.contrasena_isr || '',
+        cuenta_isn: editingContributor.cuenta_isn || '',
+        contrasena_isn: editingContributor.contrasena_isn || '',
         cuenta_sipare: editingContributor.cuenta_sipare || '',
         contrasena_sipare: editingContributor.contrasena_sipare || '',
         estado: editingContributor.estado,
@@ -969,8 +969,8 @@ function ContribuyenteFormWizard({
       contrasena_firma: '',
       cuenta_rtp: '',
       contrasena_rtp: '',
-      cuenta_isr: '',
-      contrasena_isr: '',
+      cuenta_isn: '',
+      contrasena_isn: '',
       cuenta_sipare: '',
       contrasena_sipare: '',
       estado: 'activo',
@@ -1054,8 +1054,8 @@ function ContribuyenteFormWizard({
         contrasena_firma: formData.contrasena_firma || undefined,
         cuenta_rtp: formData.cuenta_rtp || undefined,
         contrasena_rtp: formData.contrasena_rtp || undefined,
-        cuenta_isr: formData.cuenta_isr || undefined,
-        contrasena_isr: formData.contrasena_isr || undefined,
+        cuenta_isn: formData.cuenta_isn || undefined,
+        contrasena_isn: formData.contrasena_isn || undefined,
         cuenta_sipare: formData.cuenta_sipare || undefined,
         contrasena_sipare: formData.contrasena_sipare || undefined,
         estado: formData.estado,
@@ -1457,17 +1457,17 @@ function ContribuyenteFormWizard({
                     onChange={(v) => setFormData({ ...formData, contrasena_rtp: v })}
                   />
                   <div className="space-y-2">
-                    <Label>Cuenta ISR</Label>
+                    <Label>Cuenta ISN</Label>
                     <Input
-                      value={formData.cuenta_isr}
-                      onChange={(e) => setFormData({ ...formData, cuenta_isr: e.target.value })}
-                      placeholder="cuenta_isr"
+                      value={formData.cuenta_isn}
+                      onChange={(e) => setFormData({ ...formData, cuenta_isn: e.target.value })}
+                      placeholder="cuenta_isn"
                     />
                   </div>
                   <PasswordField
-                    label="Contraseña ISR"
-                    value={formData.contrasena_isr}
-                    onChange={(v) => setFormData({ ...formData, contrasena_isr: v })}
+                    label="Contraseña ISN"
+                    value={formData.contrasena_isn}
+                    onChange={(v) => setFormData({ ...formData, contrasena_isn: v })}
                   />
                   <div className="space-y-2">
                     <Label>Cuenta SIPARE</Label>
