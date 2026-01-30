@@ -32,7 +32,7 @@ export function getHeaders(includeContentType: boolean = true): Record<string, s
  * El backend usa cookies httpOnly para autenticación
  *
  * Manejo de errores:
- * - 401: Token no presente o inválido
+ * - 401: Token no presente o inválido (lanza error, el componente decide si redirigir)
  * - 403: No tienes acceso a esta organización
  */
 export async function fetchAPI<T = unknown>(
@@ -50,13 +50,7 @@ export async function fetchAPI<T = unknown>(
     credentials: 'include', // Importante: envía cookies httpOnly
   });
 
-  // Manejar errores de autenticación/autorización
-  if (response.status === 401) {
-    // Token expirado o inválido - redirigir a login
-    window.location.href = '/auth';
-    throw new Error('Sesión expirada');
-  }
-
+  // Manejar error 403 - sin acceso a organización
   if (response.status === 403) {
     const data = await response.json();
     throw new Error(data.message || 'No tienes acceso a este recurso');

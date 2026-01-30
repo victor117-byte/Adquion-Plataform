@@ -41,14 +41,7 @@ export function useApi() {
       credentials: 'include',
     });
 
-    // Manejar errores de autenticación/autorización
-    if (response.status === 401) {
-      window.location.href = '/auth';
-      const error: ApiError = new Error('Sesión expirada');
-      error.status = 401;
-      throw error;
-    }
-
+    // Manejar error 403 - sin acceso a organización
     if (response.status === 403) {
       const data = await response.json();
       const error: ApiError = new Error(data.message || 'No tienes acceso a este recurso');
