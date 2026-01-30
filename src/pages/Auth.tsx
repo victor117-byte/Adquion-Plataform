@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearchParams, Navigate } from "react-router-dom";
-import { BarChart3, Loader2 } from "lucide-react";
+import { BarChart3, Loader2, Mail, Lock, User, Phone, Calendar, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,18 +11,18 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function Auth() {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get("mode") || "login";
-  const { user, login, register, resetPassword } = useAuth();
-  
-  // Estados para login
-  const [organizacion, setOrganizacion] = useState("");
+  const { user, login, register } = useAuth();
+
+  // Estados para login (sin organización)
   const [correo, setCorreo] = useState("");
   const [contraseña, setContraseña] = useState("");
-  
+
   // Estados adicionales para registro
+  const [organizacion, setOrganizacion] = useState("");
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
-  
+
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
 
@@ -34,7 +34,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(organizacion, correo, contraseña);
+      await login(correo, contraseña);
     } finally {
       setLoading(false);
     }
@@ -44,10 +44,14 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      console.log('📝 Datos del formulario:', { organizacion, nombre, correo, telefono, fechaNacimiento });
-      await register(organizacion, nombre, correo, contraseña, telefono, fechaNacimiento);
-    } catch (error) {
-      console.error('❌ Error en handleSignup:', error);
+      await register({
+        organizacion,
+        nombre,
+        correo,
+        contraseña,
+        telefono,
+        fecha_nacimiento: fechaNacimiento,
+      });
     } finally {
       setLoading(false);
     }
@@ -57,7 +61,7 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await resetPassword(correo);
+      // TODO: Implementar reset password cuando esté disponible en el backend
       setResetMode(false);
     } finally {
       setLoading(false);
@@ -67,6 +71,7 @@ export default function Auth() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 p-4">
       <div className="w-full max-w-md">
+        {/* Logo y título */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3 mb-6 hover:opacity-80 transition-opacity group">
             <div className="p-2 bg-gradient-to-br from-primary to-purple-600 rounded-xl group-hover:scale-110 transition-transform">
@@ -93,19 +98,24 @@ export default function Auth() {
               <TabsTrigger value="signup">Registrarse</TabsTrigger>
             </TabsList>
 
+            {/* LOGIN */}
             <TabsContent value="login">
               {resetMode ? (
                 <form onSubmit={handleResetPassword} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="reset-email">Email</Label>
-                    <Input
-                      id="reset-email"
-                      type="email"
-                      placeholder="tu@email.com"
-                      value={correo}
-                      onChange={(e) => setCorreo(e.target.value)}
-                      required
-                    />
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="reset-email"
+                        type="email"
+                        placeholder="tu@email.com"
+                        value={correo}
+                        onChange={(e) => setCorreo(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
                   </div>
                   <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -123,40 +133,37 @@ export default function Auth() {
               ) : (
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="organizacion">Organización</Label>
-                    <Input
-                      id="organizacion"
-                      type="text"
-                      placeholder="mi_empresa"
-                      value={organizacion}
-                      onChange={(e) => setOrganizacion(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Correo</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="tu@email.com"
-                      value={correo}
-                      onChange={(e) => setCorreo(e.target.value)}
-                      required
-                    />
+                    <Label htmlFor="email">Correo electrónico</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="tu@email.com"
+                        value={correo}
+                        onChange={(e) => setCorreo(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Contraseña</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={contraseña}
-                      onChange={(e) => setContraseña(e.target.value)}
-                      required
-                      minLength={8}
-                    />
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={contraseña}
+                        onChange={(e) => setContraseña(e.target.value)}
+                        className="pl-10"
+                        required
+                        minLength={8}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center justify-end text-sm">
                     <button
                       type="button"
                       onClick={() => setResetMode(true)}
@@ -173,76 +180,109 @@ export default function Auth() {
               )}
             </TabsContent>
 
+            {/* REGISTRO */}
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-organizacion">Organización</Label>
-                  <Input
-                    id="signup-organizacion"
-                    type="text"
-                    placeholder="mi_empresa"
-                    value={organizacion}
-                    onChange={(e) => setOrganizacion(e.target.value)}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">Nombre de tu empresa (sin espacios)</p>
+                  <Label htmlFor="signup-organizacion">Nombre de tu empresa</Label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="signup-organizacion"
+                      type="text"
+                      placeholder="Mi Empresa S.A."
+                      value={organizacion}
+                      onChange={(e) => setOrganizacion(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Este será el nombre de tu organización</p>
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="name">Nombre completo</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Juan Pérez"
-                    value={nombre}
-                    onChange={(e) => setNombre(e.target.value)}
-                    required
-                  />
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="Juan Pérez"
+                      value={nombre}
+                      onChange={(e) => setNombre(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Correo</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={correo}
-                    onChange={(e) => setCorreo(e.target.value)}
-                    required
-                  />
+                  <Label htmlFor="signup-email">Correo electrónico</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={correo}
+                      onChange={(e) => setCorreo(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telefono">Teléfono</Label>
-                  <Input
-                    id="telefono"
-                    type="tel"
-                    placeholder="5551234567"
-                    value={telefono}
-                    onChange={(e) => setTelefono(e.target.value)}
-                    required
-                  />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="telefono">Teléfono</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="telefono"
+                        type="tel"
+                        placeholder="5551234567"
+                        value={telefono}
+                        onChange={(e) => setTelefono(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="fecha-nacimiento">Fecha de nacimiento</Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="fecha-nacimiento"
+                        type="date"
+                        value={fechaNacimiento}
+                        onChange={(e) => setFechaNacimiento(e.target.value)}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fecha-nacimiento">Fecha de nacimiento</Label>
-                  <Input
-                    id="fecha-nacimiento"
-                    type="date"
-                    value={fechaNacimiento}
-                    onChange={(e) => setFechaNacimiento(e.target.value)}
-                    required
-                  />
-                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Contraseña</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={contraseña}
-                    onChange={(e) => setContraseña(e.target.value)}
-                    required
-                    minLength={8}
-                  />
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="signup-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={contraseña}
+                      onChange={(e) => setContraseña(e.target.value)}
+                      className="pl-10"
+                      required
+                      minLength={8}
+                    />
+                  </div>
                   <p className="text-xs text-muted-foreground">Mínimo 8 caracteres</p>
                 </div>
+
                 <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Crear Cuenta

@@ -1,26 +1,48 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+import { fetchAPI, refreshToken } from '@/utils/api';
 
-interface User {
-  id: number;
+// ==================== TIPOS ====================
+
+export interface Organizacion {
+  nombre: string;
+  database: string;
+  rol: 'administrador' | 'contador';
+}
+
+export interface User {
+  userId: number;
   nombre: string;
   correo: string;
-  telefono: string;
-  fecha_nacimiento: string;
   tipo_usuario: 'administrador' | 'contador';
+  organizaciones: Organizacion[];
+  organizacionActiva: {
+    nombre: string;
+    database: string;
+  };
+}
+
+interface RegisterData {
   organizacion: string;
-  database: string;
+  nombre: string;
+  fecha_nacimiento: string;
+  contraseña: string;
+  telefono: string;
+  correo: string;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (organizacion: string, correo: string, contraseña: string) => Promise<void>;
-  register: (organizacion: string, nombre: string, correo: string, contraseña: string, telefono: string, fecha_nacimiento: string) => Promise<void>;
+  login: (correo: string, contraseña: string) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  switchOrganization: (database: string) => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
+
+// ==================== CONTEXT ====================
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -32,6 +54,8 @@ export const useAuth = () => {
   return context;
 };
 
+// ==================== PROVIDER ====================
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -41,228 +65,190 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // CONFIGURACIÓN DEL BACKEND
-  const API_URL = import.meta.env.VITE_API_URL || '/api';
-
-  // Headers comunes para todas las peticiones (incluye bypass de ngrok)
-  const getHeaders = (includeAuth = false) => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-    };
-    
-    if (includeAuth) {
-      const token = localStorage.getItem('auth_token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+  // Verificar sesión al cargar
+  const checkSession = useCallback(async () => {
+    try {
+      const response = await fetchAPI<{ success: boolean; data: User }>('/auth/me');
+      if (response.success && response.data) {
+        setUser(response.data);
       }
-    }
-    
-    return headers;
-  };
-
-  useEffect(() => {
-    // Verificar sesión guardada localmente
-    const checkSession = async () => {
-      const userData = localStorage.getItem('user_data');
-      
-      if (userData) {
-        try {
-          const parsedUser = JSON.parse(userData);
-          setUser(parsedUser);
-        } catch (error) {
-          console.error('Error al parsear datos de usuario:', error);
-          localStorage.removeItem('user_data');
-        }
-      }
-      
+    } catch {
+      setUser(null);
+    } finally {
       setLoading(false);
-    };
-
-    checkSession();
+    }
   }, []);
 
-  const login = async (organizacion: string, correo: string, contraseña: string) => {
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
+
+  // Configurar refresh automático cada 10 minutos
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(async () => {
+      try {
+        await refreshToken();
+      } catch (error) {
+        console.error('Error refreshing token:', error);
+      }
+    }, 10 * 60 * 1000); // 10 minutos
+
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const login = async (correo: string, contraseña: string) => {
     try {
-      const payload = { organizacion, correo, contraseña };
-      console.log('📤 Enviando login:', payload);
-      console.log('🔗 URL:', `${API_URL}/auth/login`);
-      
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      });
+      const response = await fetchAPI<{ success: boolean; data: User; message: string }>(
+        '/auth/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ correo, contraseña }),
+        }
+      );
 
-      console.log('📥 Respuesta status:', response.status);
-      console.log('📥 Respuesta headers:', response.headers.get('content-type'));
-      
-      // Verificar si hay contenido en la respuesta
-      const contentType = response.headers.get('content-type');
-      let data = null;
-      
-      if (response.status === 204 || !contentType || !contentType.includes('application/json')) {
-        // Respuesta sin contenido o no es JSON
-        console.log('⚠️ Respuesta sin contenido JSON');
-        if (!response.ok) {
-          throw new Error('Error al iniciar sesión: el servidor no devolvió datos');
-        }
-      } else {
-        const text = await response.text();
-        console.log('📥 Respuesta text:', text);
-        
-        if (text) {
-          data = JSON.parse(text);
-          console.log('📥 Respuesta data:', data);
-        }
+      if (!response.success || !response.data) {
+        throw new Error('El servidor no devolvió los datos del usuario');
       }
 
-      if (!response.ok) {
-        throw new Error(data?.error || data?.message || 'Credenciales inválidas');
-      }
-      
-      if (data && !data.success) {
-        throw new Error(data.message || 'Error al iniciar sesión');
-      }
-      
-      if (!data || !data.data) {
-        throw new Error('El servidor no devolvió los datos del usuario. Verifica que el backend esté funcionando correctamente.');
-      }
-      
-      // Guardar datos de usuario (el backend no devuelve token, solo datos)
-      localStorage.setItem('user_data', JSON.stringify(data.data));
-      
-      setUser(data.data);
-      
+      setUser(response.data);
+
       toast({
-        title: "¡Bienvenido!",
-        description: `Has iniciado sesión como ${data.data.nombre}`,
+        title: '¡Bienvenido!',
+        description: `Has iniciado sesión como ${response.data.nombre}`,
       });
-      
-      // Redirigir al dashboard principal
+
       navigate('/main');
     } catch (error) {
-      console.error('❌ Error en login:', error);
+      console.error('Error en login:', error);
       toast({
-        title: "Error de autenticación",
-        description: error instanceof Error ? error.message : "Error al iniciar sesión",
-        variant: "destructive",
+        title: 'Error de autenticación',
+        description: error instanceof Error ? error.message : 'Credenciales inválidas',
+        variant: 'destructive',
       });
       throw error;
     }
   };
 
-  const register = async (organizacion: string, nombre: string, correo: string, contraseña: string, telefono: string, fecha_nacimiento: string) => {
+  const register = async (data: RegisterData) => {
     try {
-      const payload = { organizacion, nombre, correo, contraseña, telefono, fecha_nacimiento };
-      console.log('📤 Enviando registro:', payload);
-      console.log('🔗 URL:', `${API_URL}/auth/register`);
-      
-      const response = await fetch(`${API_URL}/auth/register`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify(payload),
-      }).catch(err => {
-        console.error('❌ Error de red:', err);
-        throw new Error('No se pudo conectar al servidor. Verifica tu conexión o que el backend esté activo.');
+      const response = await fetchAPI<{ success: boolean; data: User; message: string }>(
+        '/auth/register',
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }
+      );
+
+      if (!response.success || !response.data) {
+        throw new Error('El servidor no devolvió los datos del usuario');
+      }
+
+      setUser({
+        userId: response.data.userId,
+        nombre: response.data.nombre,
+        correo: response.data.correo,
+        tipo_usuario: response.data.tipo_usuario,
+        organizaciones: [{
+          nombre: response.data.organizacionActiva?.nombre || data.organizacion,
+          database: response.data.organizacionActiva?.database || '',
+          rol: response.data.tipo_usuario,
+        }],
+        organizacionActiva: response.data.organizacionActiva,
       });
 
-      console.log('📥 Respuesta status:', response.status);
-      console.log('📥 Respuesta headers:', response.headers.get('content-type'));
-      
-      // Verificar si hay contenido en la respuesta
-      const contentType = response.headers.get('content-type');
-      let data = null;
-      
-      if (response.status === 204 || !contentType || !contentType.includes('application/json')) {
-        // Respuesta sin contenido o no es JSON
-        console.log('⚠️ Respuesta sin contenido JSON');
-        if (!response.ok) {
-          throw new Error('Error al registrarse: el servidor no devolvió datos');
-        }
-      } else {
-        const text = await response.text();
-        console.log('📥 Respuesta text:', text);
-        
-        if (text) {
-          data = JSON.parse(text);
-          console.log('📥 Respuesta data:', data);
-        }
-      }
-
-      if (!response.ok) {
-        throw new Error(data?.error || data?.message || 'Error al registrarse');
-      }
-      
-      if (data && !data.success) {
-        throw new Error(data.message || 'Error al crear la cuenta');
-      }
-      
-      if (!data || !data.data) {
-        throw new Error('El servidor no devolvió los datos del usuario. Verifica que el backend esté funcionando correctamente.');
-      }
-      
-      // Guardar datos de usuario
-      localStorage.setItem('user_data', JSON.stringify(data.data));
-      
-      setUser(data.data);
-      
       toast({
-        title: "¡Cuenta creada exitosamente!",
-        description: `Bienvenido ${data.data.nombre}, tu organización ha sido creada`,
+        title: '¡Cuenta creada exitosamente!',
+        description: `Bienvenido ${response.data.nombre}, tu organización ha sido creada`,
       });
-      
-      // Redirigir al dashboard principal
+
       navigate('/main');
     } catch (error) {
-      console.error('❌ Error en registro:', error);
+      console.error('Error en registro:', error);
       toast({
-        title: "Error de registro",
-        description: error instanceof Error ? error.message : "Error al crear la cuenta",
-        variant: "destructive",
+        title: 'Error de registro',
+        description: error instanceof Error ? error.message : 'Error al crear la cuenta',
+        variant: 'destructive',
       });
       throw error;
     }
   };
 
   const logout = async () => {
-    localStorage.removeItem('user_data');
-    setUser(null);
-    toast({
-      title: "Sesión cerrada",
-      description: "Has cerrado sesión exitosamente",
-    });
-    navigate('/');
+    try {
+      await fetchAPI('/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Error en logout:', error);
+    } finally {
+      setUser(null);
+      toast({
+        title: 'Sesión cerrada',
+        description: 'Has cerrado sesión exitosamente',
+      });
+      navigate('/');
+    }
   };
 
-  const resetPassword = async (email: string) => {
+  const switchOrganization = async (database: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({ email }),
+      const response = await fetchAPI<{
+        success: boolean;
+        message: string;
+        data: { organizacionActiva: { nombre: string; database: string } };
+      }>('/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ database }),
       });
 
-      if (!response.ok) {
-        throw new Error('Error al enviar correo de recuperación');
+      if (response.success && response.data) {
+        setUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                organizacionActiva: response.data.organizacionActiva,
+                tipo_usuario: prev.organizaciones.find(o => o.database === database)?.rol || prev.tipo_usuario,
+              }
+            : null
+        );
+
+        toast({
+          title: 'Organización cambiada',
+          description: `Ahora estás en ${response.data.organizacionActiva.nombre}`,
+        });
       }
-
-      toast({
-        title: "Correo enviado",
-        description: "Revisa tu correo para restablecer tu contraseña",
-      });
     } catch (error) {
+      console.error('Error cambiando organización:', error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Error al enviar correo",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudo cambiar de organización',
+        variant: 'destructive',
       });
       throw error;
     }
   };
 
+  const refreshSession = async () => {
+    try {
+      await refreshToken();
+    } catch (error) {
+      console.error('Error refreshing session:', error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, resetPassword }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        switchOrganization,
+        refreshSession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

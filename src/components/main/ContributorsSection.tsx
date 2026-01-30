@@ -189,14 +189,11 @@ function CertificadoBadge({ estado }: { estado: CertificadoEstado }) {
 // Componente para subir certificados (ahora con soporte .pem)
 function CertificadoUploader({
   contribuyenteId,
-  rfc,
   onSuccess
 }: {
   contribuyenteId: number;
-  rfc: string;
   onSuccess: () => void;
 }) {
-  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [archivoCer, setArchivoCer] = useState<File | null>(null);
   const [archivoKey, setArchivoKey] = useState<File | null>(null);
@@ -221,8 +218,6 @@ function CertificadoUploader({
 
     try {
       const formData = new FormData();
-      formData.append('correo', user?.correo || '');
-      formData.append('organizacion', user?.organizacion || '');
       formData.append('contribuyente_id', contribuyenteId.toString());
 
       if (archivoCer) formData.append('archivo_cer', archivoCer);
@@ -232,6 +227,7 @@ function CertificadoUploader({
 
       const response = await fetch(`${API_URL}/contribuyentes/certificados`, {
         method: 'POST',
+        credentials: 'include',
         body: formData
       });
 
@@ -447,15 +443,13 @@ function ContribuyenteDetailDialog({
   open,
   onClose,
   onEdit,
-  onRefresh,
-  isAdmin
+  onRefresh
 }: {
   contribuyente: Contribuyente | null;
   open: boolean;
   onClose: () => void;
   onEdit: () => void;
   onRefresh: () => void;
-  isAdmin: boolean;
 }) {
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
@@ -743,7 +737,6 @@ function ContribuyenteDetailDialog({
                 <CardContent>
                   <CertificadoUploader
                     contribuyenteId={contribuyente.id}
-                    rfc={contribuyente.rfc}
                     onSuccess={onRefresh}
                   />
                 </CardContent>
@@ -895,7 +888,6 @@ function ContribuyenteFormWizard({
   usuarios,
   isAdmin
 }: FormWizardProps) {
-  const { user: currentUser } = useAuth();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const totalSteps = 4;
@@ -1039,8 +1031,6 @@ function ContribuyenteFormWizard({
 
     try {
       const payload: any = {
-        correo_usuario: currentUser?.correo,
-        organizacion: currentUser?.organizacion,
         nombre: formData.nombre,
         tipo_persona: formData.tipo_persona,
         direccion_fiscal: formData.direccion_fiscal,
@@ -1069,6 +1059,7 @@ function ContribuyenteFormWizard({
 
         const response = await fetch(`${API_URL}/contribuyentes`, {
           method: 'PATCH',
+          credentials: 'include',
           headers: getHeaders(),
           body: JSON.stringify(payload),
         });
@@ -1087,6 +1078,7 @@ function ContribuyenteFormWizard({
 
         const response = await fetch(`${API_URL}/contribuyentes`, {
           method: 'POST',
+          credentials: 'include',
           headers: getHeaders(),
           body: JSON.stringify(payload),
         });
@@ -1557,15 +1549,11 @@ export function ContributorsSection() {
 
   const fetchContribuyentes = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) {
-        setLoading(false);
-        return;
-      }
-
       const response = await fetch(
-        `${API_URL}/contribuyentes?correo=${encodeURIComponent(currentUser.correo)}&organizacion=${encodeURIComponent(currentUser.organizacion)}`,
+        `${API_URL}/contribuyentes`,
         {
           method: 'GET',
+          credentials: 'include',
           headers: getHeaders()
         }
       );
@@ -1602,9 +1590,10 @@ export function ContributorsSection() {
   const fetchUsuarios = async () => {
     try {
       const response = await fetch(
-        `${API_URL}/auth/users?correo=${encodeURIComponent(currentUser?.correo || '')}&organizacion=${encodeURIComponent(currentUser?.organizacion || '')}`,
+        `${API_URL}/auth/users`,
         {
           method: 'GET',
+          credentials: 'include',
           headers: getHeaders()
         }
       );
@@ -1624,10 +1613,9 @@ export function ContributorsSection() {
     try {
       const response = await fetch(`${API_URL}/contribuyentes`, {
         method: 'DELETE',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify({
-          correo_usuario: currentUser?.correo,
-          organizacion: currentUser?.organizacion,
           id_contribuyente: idContribuyente,
         }),
       });
@@ -1695,7 +1683,7 @@ export function ContributorsSection() {
           <h1 className="text-2xl md:text-3xl font-bold">Contribuyentes</h1>
           <p className="text-muted-foreground mt-1">
             {isAdmin
-              ? `Gestiona todos los contribuyentes de ${currentUser?.organizacion}`
+              ? `Gestiona todos los contribuyentes de ${currentUser?.organizacionActiva?.nombre}`
               : 'Tus contribuyentes asignados'
             }
           </p>
@@ -1908,7 +1896,6 @@ export function ContributorsSection() {
             if (updated) setSelectedContributor(updated);
           }
         }}
-        isAdmin={isAdmin}
       />
 
       {/* Formulario Wizard */}

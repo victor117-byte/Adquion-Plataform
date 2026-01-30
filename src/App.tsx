@@ -20,10 +20,10 @@ const ThemeSync = ({ children }: { children: React.ReactNode }) => {
   const { loadPreferencesFromServer } = useTheme();
 
   useEffect(() => {
-    if (user?.correo && user?.organizacion) {
-      loadPreferencesFromServer(user.correo, user.organizacion);
+    if (user) {
+      loadPreferencesFromServer();
     }
-  }, [user?.correo, user?.organizacion, loadPreferencesFromServer]);
+  }, [user, loadPreferencesFromServer]);
 
   return <>{children}</>;
 };

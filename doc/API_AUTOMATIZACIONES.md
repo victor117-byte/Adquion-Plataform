@@ -1,8 +1,20 @@
 # API de Automatizaciones
 
+> **IMPORTANTE**: Ver [CAMBIOS_SEGURIDAD_ORGANIZACIONES.md](./CAMBIOS_SEGURIDAD_ORGANIZACIONES.md) para la guía completa de migración de seguridad.
+
 ## Resumen
 
 Sistema completo para gestionar automatizaciones programadas con ejecución basada en expresiones cron. Las automatizaciones se ejecutan automáticamente según su programación y los logs se registran con zona horaria de México.
+
+## Autenticación
+
+Todos los endpoints requieren **autenticación vía JWT en cookies**. Incluir `credentials: 'include'` en todas las peticiones.
+
+```typescript
+fetch('/api/automatizaciones', { credentials: 'include' });
+```
+
+> **Nota**: Los parámetros `correo` y `correo_admin` ya NO son necesarios. El backend los obtiene del JWT.
 
 ---
 
@@ -30,15 +42,14 @@ Sistema completo para gestionar automatizaciones programadas con ejecución basa
 **Solo administradores** pueden acceder.
 
 ```
-GET /api/automatizaciones?correo={email}&organizacion={org}
+GET /api/automatizaciones?organizacion={org}
 ```
 
 ### Parámetros Query
 
 | Parámetro | Tipo | Requerido | Descripción |
 |-----------|------|-----------|-------------|
-| `correo` | string | Sí | Email del administrador |
-| `organizacion` | string | Sí | Nombre de la organización |
+| `organizacion` | string | No | Nombre de la organización (opcional, usa la org activa del JWT si no se envía) |
 
 ### Respuesta Exitosa (200)
 
@@ -95,7 +106,6 @@ Content-Type: application/json
 
 ```json
 {
-  "correo_admin": "admin@empresa.com",
   "organizacion": "MiEmpresa",
   "nombre": "prod_mi_automatizacion",
   "descripcion": "Descripción de la automatización",
@@ -113,8 +123,7 @@ Content-Type: application/json
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
-| `correo_admin` | string | Sí | Email del administrador |
-| `organizacion` | string | Sí | Nombre de la organización |
+| `organizacion` | string | No | Nombre de la organización (opcional, usa la org activa del JWT) |
 | `nombre` | string | Sí | **Debe empezar con `prod_`** |
 | `descripcion` | string | No | Descripción de la automatización |
 | `script_path` | string | Sí | Ruta relativa desde `app/Automatizacion/` |
@@ -160,7 +169,6 @@ Content-Type: application/json
 
 ```json
 {
-  "correo_admin": "admin@empresa.com",
   "organizacion": "MiEmpresa",
   "id_automatizacion": 1,
   "activo": true,
@@ -170,6 +178,8 @@ Content-Type: application/json
   }
 }
 ```
+
+> **Nota**: El campo `organizacion` es opcional. Si no se envía, usa la organización activa del JWT.
 
 ### Campos Editables
 
@@ -210,11 +220,12 @@ Content-Type: application/json
 
 ```json
 {
-  "correo_admin": "admin@empresa.com",
   "organizacion": "MiEmpresa",
   "id_automatizacion": 1
 }
 ```
+
+> **Nota**: El campo `organizacion` es opcional. Si no se envía, usa la organización activa del JWT.
 
 ### Respuesta Exitosa (200)
 
@@ -331,10 +342,15 @@ interface Automatizacion {
   ejecuciones_error: number;
 }
 
-async function listarAutomatizaciones(correo: string, organizacion: string) {
-  const res = await fetch(
-    `/api/automatizaciones?correo=${encodeURIComponent(correo)}&organizacion=${encodeURIComponent(organizacion)}`
-  );
+async function listarAutomatizaciones(organizacion?: string) {
+  // organizacion es opcional - si no se envía, usa la org activa del JWT
+  const url = organizacion
+    ? `/api/automatizaciones?organizacion=${encodeURIComponent(organizacion)}`
+    : '/api/automatizaciones';
+
+  const res = await fetch(url, {
+    credentials: 'include'  // Importante para enviar cookies JWT
+  });
   const data = await res.json();
 
   if (data.success) {
@@ -348,8 +364,7 @@ async function listarAutomatizaciones(correo: string, organizacion: string) {
 
 ```typescript
 interface CrearAutomatizacionDTO {
-  correo_admin: string;
-  organizacion: string;
+  organizacion?: string;  // Opcional: si no se envía, usa la org activa del JWT
   nombre: string; // Debe empezar con "prod_"
   descripcion?: string;
   script_path: string;
@@ -366,6 +381,7 @@ async function crearAutomatizacion(data: CrearAutomatizacionDTO) {
 
   const res = await fetch('/api/automatizaciones', {
     method: 'POST',
+    credentials: 'include',  // Importante para enviar cookies JWT
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   });
@@ -378,16 +394,15 @@ async function crearAutomatizacion(data: CrearAutomatizacionDTO) {
 
 ```typescript
 async function toggleAutomatizacion(
-  correo: string,
-  organizacion: string,
   id: number,
-  activo: boolean
+  activo: boolean,
+  organizacion?: string  // Opcional: si no se envía, usa la org activa del JWT
 ) {
   const res = await fetch('/api/automatizaciones', {
     method: 'PATCH',
+    credentials: 'include',  // Importante para enviar cookies JWT
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      correo_admin: correo,
       organizacion,
       id_automatizacion: id,
       activo

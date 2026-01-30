@@ -65,7 +65,6 @@ import {
 } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 // ==================== TIPOS ====================
 
@@ -426,8 +425,6 @@ function PaginationControl({ pagination, onPageChange, loading }: PaginationProp
 // ==================== COMPONENTE PRINCIPAL ====================
 
 export function DocumentsSection() {
-  const { user: currentUser } = useAuth();
-
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -455,15 +452,11 @@ export function DocumentsSection() {
   const isInitialMount = useRef(true);
 
   const fetchDocumentos = useCallback(async (page = 1, filters?: { search?: string; contribuyente?: string }) => {
-    if (!currentUser?.correo || !currentUser?.organizacion) return;
-
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams({
-        correo: currentUser.correo,
-        organizacion: currentUser.organizacion,
         page: page.toString(),
         limit: '12',
         orden: 'created_at',
@@ -477,6 +470,7 @@ export function DocumentsSection() {
       if (contribuyente !== 'all') params.append('contribuyente_id', contribuyente);
 
       const response = await fetch(`${API_URL}/documentos?${params}`, {
+        credentials: 'include',
         headers: getHeaders(),
       });
 
@@ -495,18 +489,12 @@ export function DocumentsSection() {
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.correo, currentUser?.organizacion, searchQuery, selectedContribuyente]);
+  }, [searchQuery, selectedContribuyente]);
 
   const fetchContribuyentes = useCallback(async () => {
-    if (!currentUser?.correo || !currentUser?.organizacion) return;
-
     try {
-      const params = new URLSearchParams({
-        correo: currentUser.correo,
-        organizacion: currentUser.organizacion,
-      });
-
-      const response = await fetch(`${API_URL}/contribuyentes?${params}`, {
+      const response = await fetch(`${API_URL}/contribuyentes`, {
+        credentials: 'include',
         headers: getHeaders(),
       });
 
@@ -519,14 +507,12 @@ export function DocumentsSection() {
     } catch (err) {
       console.error('Error cargando contribuyentes:', err);
     }
-  }, [currentUser?.correo, currentUser?.organizacion]);
+  }, []);
 
   useEffect(() => {
-    if (currentUser?.correo && currentUser?.organizacion) {
-      fetchDocumentos(1);
-      fetchContribuyentes();
-    }
-  }, [currentUser?.correo, currentUser?.organizacion]);
+    fetchDocumentos(1);
+    fetchContribuyentes();
+  }, []);
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -535,9 +521,7 @@ export function DocumentsSection() {
     }
 
     const timer = setTimeout(() => {
-      if (currentUser?.correo && currentUser?.organizacion) {
-        fetchDocumentos(1, { search: searchQuery, contribuyente: selectedContribuyente });
-      }
+      fetchDocumentos(1, { search: searchQuery, contribuyente: selectedContribuyente });
     }, 400);
     return () => clearTimeout(timer);
   }, [searchQuery, selectedContribuyente]);
@@ -574,7 +558,7 @@ export function DocumentsSection() {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !selectedContribuyenteForUpload || !currentUser) {
+    if (!selectedFile || !selectedContribuyenteForUpload) {
       return;
     }
 
@@ -583,8 +567,6 @@ export function DocumentsSection() {
 
     const formData = new FormData();
     formData.append('archivo', selectedFile);
-    formData.append('correo', currentUser.correo);
-    formData.append('organizacion', currentUser.organizacion);
     formData.append('contribuyente_id', selectedContribuyenteForUpload);
     formData.append('tipo_documento', 'pdf');
 
@@ -597,6 +579,7 @@ export function DocumentsSection() {
 
       const response = await fetch(`${API_URL}/documentos`, {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       });
 
@@ -668,15 +651,14 @@ export function DocumentsSection() {
   };
 
   const handleDelete = async () => {
-    if (!docToDelete || !currentUser) return;
+    if (!docToDelete) return;
 
     try {
       const response = await fetch(`${API_URL}/documentos`, {
         method: 'DELETE',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify({
-          correo: currentUser.correo,
-          organizacion: currentUser.organizacion,
           documento_id: docToDelete.id,
         }),
       });
@@ -704,13 +686,11 @@ export function DocumentsSection() {
   };
 
   const getPreviewUrl = (doc: Documento) => {
-    if (!currentUser) return '';
-    return `${API_URL}/documentos/archivo?documento_id=${doc.id}&correo=${encodeURIComponent(currentUser.correo)}&organizacion=${encodeURIComponent(currentUser.organizacion)}&modo=preview`;
+    return `${API_URL}/documentos/archivo?documento_id=${doc.id}&modo=preview`;
   };
 
   const getDownloadUrl = (doc: Documento) => {
-    if (!currentUser) return '';
-    return `${API_URL}/documentos/archivo?documento_id=${doc.id}&correo=${encodeURIComponent(currentUser.correo)}&organizacion=${encodeURIComponent(currentUser.organizacion)}&modo=download`;
+    return `${API_URL}/documentos/archivo?documento_id=${doc.id}&modo=download`;
   };
 
   // ==================== SUB-COMPONENTES ====================

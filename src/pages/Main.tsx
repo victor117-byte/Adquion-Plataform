@@ -1,21 +1,32 @@
 import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Users, 
-  UserCheck, 
-  FileText, 
-  Zap, 
-  Bell, 
+import {
+  LayoutDashboard,
+  Users,
+  UserCheck,
+  FileText,
+  Zap,
+  Bell,
   BarChart3,
   Settings,
   LogOut,
   Menu,
-  ChevronLeft
+  ChevronLeft,
+  CreditCard,
+  Building2,
+  ChevronDown,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/hooks/use-subscription";
 import { cn } from "@/lib/utils";
 
 // Import section components
@@ -27,15 +38,17 @@ import { AutomationsSection } from "@/components/main/AutomationsSection";
 import { NotificationsSection } from "@/components/main/NotificationsSection";
 import { PowerBISection } from "@/components/main/PowerBISection";
 import { SettingsSection } from "@/components/main/SettingsSection";
+import { SubscriptionSection } from "@/components/main/SubscriptionSection";
 import { FeedbackButton } from "@/components/FeedbackButton";
 
-type SectionType = 'dashboard' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications' | 'powerbi' | 'settings';
+type SectionType = 'dashboard' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications' | 'powerbi' | 'settings' | 'subscription';
 
 interface NavItem {
   id: SectionType;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
+  freeOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -47,32 +60,32 @@ const navItems: NavItem[] = [
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
   { id: 'powerbi', label: 'Reportes', icon: BarChart3 },
   { id: 'settings', label: 'Configuración', icon: Settings, adminOnly: true },
+  { id: 'subscription', label: 'Planes', icon: CreditCard, freeOnly: true },
 ];
 
 export default function Main() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, loading, switchOrganization } = useAuth();
+  const { isFree, loading: subLoading } = useSubscription();
   const [activeSection, setActiveSection] = useState<SectionType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [hasReportes, setHasReportes] = useState(false);
   const [checkingReportes, setCheckingReportes] = useState(true);
 
+  const hasMultipleOrgs = user && user.organizaciones && user.organizaciones.length > 1;
+
   useEffect(() => {
     // Verificar si hay reportes disponibles
     const checkReportes = async () => {
-      if (!user?.correo || !user?.organizacion) {
-        setCheckingReportes(false);
-        return;
-      }
-
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+        const API_URL = import.meta.env.VITE_API_URL || '/api';
         const response = await fetch(
-          `${API_URL}/reportes?correo=${encodeURIComponent(user.correo)}&organizacion=${encodeURIComponent(user.organizacion)}`
+          `${API_URL}/reportes`,
+          { credentials: 'include' }
         );
-        
+
         const result = await response.json();
-        
+
         if (result.success && result.data.reportes && result.data.reportes.length > 0) {
           setHasReportes(true);
         } else {
@@ -89,7 +102,7 @@ export default function Main() {
     checkReportes();
   }, [user]);
 
-  if (loading || checkingReportes) {
+  if (loading || checkingReportes || subLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -103,14 +116,17 @@ export default function Main() {
 
   const isAdmin = user.tipo_usuario === 'administrador';
 
-  // Filtrar items del menú según permisos y disponibilidad de reportes
+  // Filtrar items del menú según permisos y disponibilidad
   const filteredNavItems = navItems.filter(item => {
     // Filtrar items solo para admin
     if (item.adminOnly && !isAdmin) return false;
-    
-    // Ocultar Reportes si no hay reportes configurados (para todos los usuarios)
+
+    // Ocultar Reportes si no hay reportes configurados
     if (item.id === 'powerbi' && !hasReportes) return false;
-    
+
+    // Mostrar Planes solo para usuarios free
+    if (item.freeOnly && !isFree) return false;
+
     return true;
   });
 
@@ -132,6 +148,8 @@ export default function Main() {
         return <PowerBISection />;
       case 'settings':
         return isAdmin ? <SettingsSection /> : <Navigate to="/main" replace />;
+      case 'subscription':
+        return <SubscriptionSection />;
       default:
         return <DashboardSection />;
     }
@@ -151,20 +169,18 @@ export default function Main() {
 
       {/* Overlay para cerrar menú móvil */}
       {mobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={cn(
           "fixed left-0 top-0 h-full border-r border-border bg-card transition-all duration-300 z-50",
-          // Desktop
           "hidden md:block",
           sidebarCollapsed ? "md:w-16" : "md:w-64",
-          // Mobile
           mobileMenuOpen ? "block w-64" : "hidden"
         )}
       >
@@ -196,16 +212,60 @@ export default function Main() {
             <ChevronLeft className="h-3 w-3" />
           )}
         </Button>
-        
+
+        {/* Organization Switcher */}
+        {hasMultipleOrgs && (!sidebarCollapsed || mobileMenuOpen) && (
+          <div className="p-3 border-b border-border">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full justify-between text-left h-auto py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {user.organizacionActiva?.nombre || 'Organización'}
+                      </p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {user.tipo_usuario}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {user.organizaciones.map((org) => (
+                  <DropdownMenuItem
+                    key={org.database}
+                    onClick={() => switchOrganization(org.database)}
+                    className="flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{org.nombre}</span>
+                      <span className="text-xs text-muted-foreground capitalize">
+                        {org.rol}
+                      </span>
+                    </div>
+                    {user.organizacionActiva?.database === org.database && (
+                      <Check className="h-4 w-4 text-primary" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+
         {/* Navigation */}
-        <nav className="p-3 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+        <nav className="p-3 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 240px)' }}>
           {filteredNavItems.map((item) => (
-            <Button 
+            <Button
               key={item.id}
-              variant={activeSection === item.id ? "default" : "ghost"} 
+              variant={activeSection === item.id ? "default" : "ghost"}
               className={cn(
                 "w-full justify-start text-base md:text-sm h-12 md:h-10",
-                sidebarCollapsed && "md:justify-center md:px-2"
+                sidebarCollapsed && "md:justify-center md:px-2",
+                item.freeOnly && "text-primary"
               )}
               onClick={() => {
                 setActiveSection(item.id);
@@ -214,11 +274,20 @@ export default function Main() {
               title={sidebarCollapsed ? item.label : undefined}
             >
               <item.icon className={cn("h-5 w-5 md:h-4 md:w-4", (!sidebarCollapsed || mobileMenuOpen) && "mr-3")} />
-              {(!sidebarCollapsed || mobileMenuOpen) && <span>{item.label}</span>}
+              {(!sidebarCollapsed || mobileMenuOpen) && (
+                <>
+                  <span>{item.label}</span>
+                  {item.freeOnly && (
+                    <Badge variant="secondary" className="ml-auto text-[10px] px-1.5">
+                      Upgrade
+                    </Badge>
+                  )}
+                </>
+              )}
             </Button>
           ))}
         </nav>
-        
+
         {/* User Info & Logout */}
         <div className={cn(
           "absolute bottom-0 left-0 right-0 p-3 border-t border-border bg-card",
@@ -228,13 +297,15 @@ export default function Main() {
             <div className="mb-3 px-3">
               <p className="text-sm font-medium truncate">{user.nombre}</p>
               <p className="text-xs text-muted-foreground truncate">{user.correo}</p>
-              <Badge className="mt-1" variant={user.tipo_usuario === 'administrador' ? 'default' : 'secondary'}>
-                {user.tipo_usuario}
-              </Badge>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant={user.tipo_usuario === 'administrador' ? 'default' : 'secondary'}>
+                  {user.tipo_usuario}
+                </Badge>
+              </div>
             </div>
           )}
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className={cn(
               "w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 h-12 md:h-10",
               sidebarCollapsed && "md:justify-center md:px-2"
@@ -251,7 +322,7 @@ export default function Main() {
       {/* Main Content */}
       <main className={cn(
         "flex-1 transition-all duration-300",
-        "pt-16 md:pt-0", // Padding top en móvil para el botón de menú
+        "pt-16 md:pt-0",
         sidebarCollapsed ? "md:ml-16" : "md:ml-64"
       )}>
         <div className="p-4 md:p-6 lg:p-8">

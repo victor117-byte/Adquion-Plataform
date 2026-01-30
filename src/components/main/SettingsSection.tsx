@@ -88,15 +88,11 @@ export function SettingsSection() {
 
   const fetchReportes = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) {
-        setLoading(false);
-        return;
-      }
-
       const response = await fetch(
-        `${API_URL}/reportes?correo=${encodeURIComponent(currentUser.correo)}&organizacion=${encodeURIComponent(currentUser.organizacion)}`,
+        `${API_URL}/reportes`,
         {
           method: 'GET',
+          credentials: 'include',
           headers: getHeaders()
         }
       );
@@ -120,12 +116,11 @@ export function SettingsSection() {
 
   const fetchUsuarios = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) return;
-
       const response = await fetch(
-        `${API_URL}/auth/users?correo=${encodeURIComponent(currentUser.correo)}&organizacion=${encodeURIComponent(currentUser.organizacion)}`,
+        `${API_URL}/auth/users`,
         {
           method: 'GET',
+          credentials: 'include',
           headers: getHeaders()
         }
       );
@@ -164,10 +159,9 @@ export function SettingsSection() {
         // Editar reporte existente
         const response = await fetch(`${API_URL}/reportes`, {
           method: 'PATCH',
+          credentials: 'include',
           headers: getHeaders(),
           body: JSON.stringify({
-            correo_admin: currentUser?.correo,
-            organizacion: currentUser?.organizacion,
             id_reporte: editingReporte.id,
             titulo: formData.titulo,
             descripcion: formData.descripcion,
@@ -194,10 +188,9 @@ export function SettingsSection() {
         // Crear nuevo reporte
         const response = await fetch(`${API_URL}/reportes`, {
           method: 'POST',
+          credentials: 'include',
           headers: getHeaders(),
           body: JSON.stringify({
-            correo_admin: currentUser?.correo,
-            organizacion: currentUser?.organizacion,
             titulo: formData.titulo,
             descripcion: formData.descripcion,
             url_embed: formData.url_embed,
@@ -235,10 +228,9 @@ export function SettingsSection() {
     try {
       const response = await fetch(`${API_URL}/reportes`, {
         method: 'DELETE',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify({
-          correo_admin: currentUser?.correo,
-          organizacion: currentUser?.organizacion,
           id_reporte: idReporte,
         }),
       });

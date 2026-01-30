@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Edit, Trash2, UserCheck, Shield } from "lucide-react";
+import { Plus, Search, Edit, Trash2, UserCheck, Shield, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -29,6 +29,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { get, post, patch, del } from "@/utils/api";
 
 interface User {
   id: number;
@@ -37,28 +38,29 @@ interface User {
   telefono: string;
   fecha_nacimiento: string;
   tipo_usuario: 'administrador' | 'contador';
-  organizacion: string;
-  database: string;
   created_at?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-const getHeaders = () => ({
-  'Content-Type': 'application/json',
-  'ngrok-skip-browser-warning': 'true',
-});
+interface UsersResponse {
+  success: boolean;
+  data: {
+    role: 'administrador' | 'contador';
+    database: string;
+    totalUsers: number;
+    users: User[];
+  };
+}
 
 export function UsersSection() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'administrador' | 'contador'>('contador');
 
-  // Form state para crear usuario
   const [formData, setFormData] = useState({
     nombre: '',
     correo: '',
@@ -70,65 +72,28 @@ export function UsersSection() {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [currentUser]);
 
   const fetchUsers = async () => {
+    if (!currentUser?.organizacionActiva?.database) return;
+
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) {
-        console.error('❌ Faltan datos del usuario actual');
-        return;
-      }
+      setLoading(true);
+      const response = await get<UsersResponse>('/auth/users');
 
-      console.log('📤 Fetching users para:', {
-        correo: currentUser.correo,
-        organizacion: currentUser.organizacion,
-      });
+      if (response.success && response.data) {
+        setUserRole(response.data.role);
+        setUsers(response.data.users || []);
 
-      const response = await fetch(
-        `${API_URL}/auth/users?correo=${encodeURIComponent(currentUser.correo)}&organizacion=${encodeURIComponent(currentUser.organizacion)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
+        if (response.data.role === 'contador') {
+          toast({
+            title: "Vista de Contador",
+            description: "Solo puedes ver tu propia información",
+          });
         }
-      );
-      
-      console.log('📥 Respuesta status:', response.status);
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('📥 Respuesta completa:', result);
-        
-        if (result.success && result.data) {
-          const { role, users: fetchedUsers } = result.data;
-          console.log('📥 Rol del usuario:', role);
-          console.log('📥 Usuarios recibidos:', fetchedUsers);
-          
-          setUserRole(role);
-          setUsers(fetchedUsers || []);
-          
-          // Mostrar mensaje si es contador
-          if (role === 'contador') {
-            toast({
-              title: "Vista de Contador",
-              description: "Solo puedes ver tu propia información",
-            });
-          }
-        } else {
-          throw new Error('Formato de respuesta inválido');
-        }
-      } else {
-        const error = await response.json();
-        console.error('❌ Error:', error);
-        toast({
-          title: "Error",
-          description: error.error || "No se pudieron cargar los usuarios",
-          variant: "destructive",
-        });
       }
     } catch (error) {
-      console.error('❌ Error fetching users:', error);
+      console.error('Error fetching users:', error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los usuarios",
@@ -140,88 +105,73 @@ export function UsersSection() {
   };
 
   const handleSaveUser = async () => {
+    setSaving(true);
+
     try {
       if (editingUser) {
-        // Actualizar rol de usuario existente
-        const response = await fetch(`${API_URL}/auth/users`, {
-          method: 'PATCH',
-          headers: getHeaders(),
-          body: JSON.stringify({
-            correo_admin: currentUser?.correo,
-            organizacion: currentUser?.organizacion,
-            id_usuario: editingUser.id,
-            tipo_usuario: formData.tipo_usuario,
-          }),
+        // Actualizar rol de usuario existente (PATCH /api/auth/users)
+        await patch('/auth/users', {
+          id_usuario: editingUser.id,
+          tipo_usuario: formData.tipo_usuario,
+          database: currentUser?.organizacionActiva?.database,
         });
 
-        const result = await response.json();
-        
-        if (result.success) {
-          toast({
-            title: "Usuario actualizado",
-            description: "El rol del usuario se actualizó correctamente",
-          });
-          fetchUsers();
-          setDialogOpen(false);
-          resetForm();
-        } else {
-          throw new Error(result.message || 'Error al actualizar');
-        }
+        toast({
+          title: "Usuario actualizado",
+          description: "El rol del usuario se actualizó correctamente",
+        });
       } else {
-        // Validar que todos los campos estén completos
-        if (!formData.nombre || !formData.correo || !formData.telefono || 
+        // Validar campos
+        if (!formData.nombre || !formData.correo || !formData.telefono ||
             !formData.fecha_nacimiento || !formData.contraseña) {
           toast({
             title: "Campos incompletos",
             description: "Por favor completa todos los campos requeridos",
             variant: "destructive",
           });
+          setSaving(false);
           return;
         }
 
-        // Crear nuevo usuario
-        const payload = {
-          organizacion: currentUser?.organizacion,
+        if (formData.contraseña.length < 8) {
+          toast({
+            title: "Contraseña muy corta",
+            description: "La contraseña debe tener al menos 8 caracteres",
+            variant: "destructive",
+          });
+          setSaving(false);
+          return;
+        }
+
+        // Crear nuevo usuario (POST /api/auth/users)
+        await post('/auth/users', {
           nombre: formData.nombre,
           correo: formData.correo,
-          telefono: formData.telefono,
-          fecha_nacimiento: formData.fecha_nacimiento,
           contraseña: formData.contraseña,
-        };
-
-        console.log('📤 Creando usuario:', payload);
-
-        const response = await fetch(`${API_URL}/auth/register`, {
-          method: 'POST',
-          headers: getHeaders(),
-          body: JSON.stringify(payload),
+          fecha_nacimiento: formData.fecha_nacimiento,
+          telefono: formData.telefono,
+          tipo_usuario: formData.tipo_usuario,
+          database: currentUser?.organizacionActiva?.database,
         });
 
-        console.log('📥 Respuesta status:', response.status);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📥 Usuario creado:', data);
-          toast({
-            title: "Usuario creado",
-            description: "El nuevo usuario fue creado exitosamente",
-          });
-          fetchUsers();
-          setDialogOpen(false);
-          resetForm();
-        } else {
-          const error = await response.json();
-          console.error('❌ Error:', error);
-          throw new Error(error.error || error.message || 'Error al crear usuario');
-        }
+        toast({
+          title: "Usuario creado",
+          description: "El nuevo usuario fue creado exitosamente",
+        });
       }
+
+      fetchUsers();
+      setDialogOpen(false);
+      resetForm();
     } catch (error) {
-      console.error('❌ Error al guardar usuario:', error);
+      console.error('Error saving user:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo guardar el usuario",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -229,29 +179,18 @@ export function UsersSection() {
     if (!confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) return;
 
     try {
-      const response = await fetch(`${API_URL}/auth/users`, {
-        method: 'DELETE',
-        headers: getHeaders(),
-        body: JSON.stringify({
-          correo_admin: currentUser?.correo,
-          organizacion: currentUser?.organizacion,
-          id_usuario: userId,
-        }),
+      await del('/auth/users', {
+        id_usuario: userId,
+        database: currentUser?.organizacionActiva?.database,
       });
 
-      const result = await response.json();
-      
-      if (result.success) {
-        toast({ 
-          title: "Usuario eliminado",
-          description: "El usuario fue eliminado correctamente"
-        });
-        fetchUsers();
-      } else {
-        throw new Error(result.message || 'Error al eliminar');
-      }
+      toast({
+        title: "Usuario eliminado",
+        description: "El usuario fue eliminado correctamente"
+      });
+      fetchUsers();
     } catch (error) {
-      console.error('❌ Error al eliminar usuario:', error);
+      console.error('Error deleting user:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "No se pudo eliminar el usuario",
@@ -261,9 +200,9 @@ export function UsersSection() {
   };
 
   const resetForm = () => {
-    setFormData({ 
-      nombre: '', 
-      correo: '', 
+    setFormData({
+      nombre: '',
+      correo: '',
       telefono: '',
       fecha_nacimiento: '',
       contraseña: '',
@@ -279,7 +218,7 @@ export function UsersSection() {
       correo: user.correo,
       telefono: user.telefono,
       fecha_nacimiento: user.fecha_nacimiento,
-      contraseña: '', // No mostramos la contraseña
+      contraseña: '',
       tipo_usuario: user.tipo_usuario,
     });
     setDialogOpen(true);
@@ -316,8 +255,8 @@ export function UsersSection() {
             {userRole === 'administrador' ? 'Gestionar Usuarios' : 'Mi Perfil'}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {userRole === 'administrador' 
-              ? `Gestiona los usuarios de tu organización: ${currentUser?.organizacion}`
+            {userRole === 'administrador'
+              ? `Gestiona los usuarios de ${currentUser?.organizacionActiva?.nombre}`
               : 'Información de tu cuenta'
             }
           </p>
@@ -340,101 +279,104 @@ export function UsersSection() {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-              {!editingUser && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="nombre">Nombre completo *</Label>
-                    <Input
-                      id="nombre"
-                      value={formData.nombre}
-                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                      placeholder="Juan Pérez"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="correo">Correo electrónico *</Label>
-                    <Input
-                      id="correo"
-                      type="email"
-                      value={formData.correo}
-                      onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
-                      placeholder="usuario@ejemplo.com"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="telefono">Teléfono *</Label>
-                    <Input
-                      id="telefono"
-                      type="tel"
-                      value={formData.telefono}
-                      onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
-                      placeholder="5551234567"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="fecha_nacimiento">Fecha de nacimiento *</Label>
-                    <Input
-                      id="fecha_nacimiento"
-                      type="date"
-                      value={formData.fecha_nacimiento}
-                      onChange={(e) => setFormData({ ...formData, fecha_nacimiento: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contraseña">Contraseña *</Label>
-                    <Input
-                      id="contraseña"
-                      type="password"
-                      value={formData.contraseña}
-                      onChange={(e) => setFormData({ ...formData, contraseña: e.target.value })}
-                      placeholder="Mínimo 8 caracteres"
-                      minLength={8}
-                      required
-                    />
-                  </div>
-                </>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="tipo_usuario">Tipo de Usuario *</Label>
-                <Select
-                  value={formData.tipo_usuario}
-                  onValueChange={(value: 'administrador' | 'contador') => 
-                    setFormData({ ...formData, tipo_usuario: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="contador">Contador</SelectItem>
-                    <SelectItem value="administrador">Administrador</SelectItem>
-                  </SelectContent>
-                </Select>
-                {editingUser && (
-                  <p className="text-xs text-muted-foreground">
-                    Solo puedes cambiar el rol del usuario
-                  </p>
+                {!editingUser && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="nombre">Nombre completo *</Label>
+                      <Input
+                        id="nombre"
+                        value={formData.nombre}
+                        onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                        placeholder="Juan Pérez"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="correo">Correo electrónico *</Label>
+                      <Input
+                        id="correo"
+                        type="email"
+                        value={formData.correo}
+                        onChange={(e) => setFormData({ ...formData, correo: e.target.value })}
+                        placeholder="usuario@ejemplo.com"
+                        required
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="telefono">Teléfono *</Label>
+                        <Input
+                          id="telefono"
+                          type="tel"
+                          value={formData.telefono}
+                          onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                          placeholder="5551234567"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fecha_nacimiento">Fecha nac. *</Label>
+                        <Input
+                          id="fecha_nacimiento"
+                          type="date"
+                          value={formData.fecha_nacimiento}
+                          onChange={(e) => setFormData({ ...formData, fecha_nacimiento: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="contraseña">Contraseña *</Label>
+                      <Input
+                        id="contraseña"
+                        type="password"
+                        value={formData.contraseña}
+                        onChange={(e) => setFormData({ ...formData, contraseña: e.target.value })}
+                        placeholder="Mínimo 8 caracteres"
+                        minLength={8}
+                        required
+                      />
+                    </div>
+                  </>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="tipo_usuario">Tipo de Usuario *</Label>
+                  <Select
+                    value={formData.tipo_usuario}
+                    onValueChange={(value: 'administrador' | 'contador') =>
+                      setFormData({ ...formData, tipo_usuario: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contador">Contador</SelectItem>
+                      <SelectItem value="administrador">Administrador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {editingUser && (
+                    <p className="text-xs text-muted-foreground">
+                      Solo puedes cambiar el rol del usuario
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => {
+                    setDialogOpen(false);
+                    resetForm();
+                  }}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSaveUser} disabled={saving}>
+                    {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    {editingUser ? 'Guardar Cambios' : 'Crear Usuario'}
+                  </Button>
+                </div>
               </div>
-              
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => {
-                  setDialogOpen(false);
-                  resetForm();
-                }}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSaveUser}>
-                  {editingUser ? 'Guardar Cambios' : 'Crear Usuario'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
+            </DialogContent>
           </Dialog>
         )}
       </div>
@@ -471,7 +413,7 @@ export function UsersSection() {
               <TableRow>
                 <TableCell colSpan={userRole === 'administrador' ? 5 : 4} className="text-center py-8">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
                     <span>Cargando usuarios...</span>
                   </div>
                 </TableCell>
@@ -479,7 +421,7 @@ export function UsersSection() {
             ) : filteredUsers.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={userRole === 'administrador' ? 5 : 4} className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? 'No se encontraron usuarios que coincidan con la búsqueda' : 'No hay usuarios registrados'}
+                  {searchQuery ? 'No se encontraron usuarios' : 'No hay usuarios registrados'}
                 </TableCell>
               </TableRow>
             ) : (

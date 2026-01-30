@@ -1,5 +1,7 @@
 import { FileText, Users, Upload, TrendingUp, Clock, CheckCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { PlanLimitsCard } from "./PlanLimitsCard";
+import { useSubscription } from "@/hooks/use-subscription";
 
 const statsData = [
   {
@@ -64,14 +66,22 @@ const recentActivity = [
 ];
 
 export function DashboardSection() {
+  const { subscription } = useSubscription();
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Resumen general de tu cuenta
-        </p>
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Resumen general de tu cuenta
+          </p>
+        </div>
+        {/* Plan Limits Card - Only shows for free users or when near limits */}
+        <div className="lg:w-80">
+          <PlanLimitsCard />
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -143,7 +153,9 @@ export function DashboardSection() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Plan actual</span>
-              <span className="text-sm font-medium text-primary">Pro</span>
+              <span className="text-sm font-medium text-primary">
+                {subscription?.plan_name || 'Cargando...'}
+              </span>
             </div>
           </div>
         </Card>

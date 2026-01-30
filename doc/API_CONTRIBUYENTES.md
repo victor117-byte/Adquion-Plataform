@@ -8,9 +8,23 @@ El endpoint `/api/contribuyentes` permite gestionar contribuyentes fiscales con 
 
 ## Autenticación y Permisos
 
-Todos los endpoints requieren:
-- `correo` / `correo_usuario`: Email del usuario autenticado
-- `organizacion`: Nombre de la organización
+> **IMPORTANTE**: Ver [CAMBIOS_SEGURIDAD_ORGANIZACIONES.md](./CAMBIOS_SEGURIDAD_ORGANIZACIONES.md) para la guía completa de migración.
+
+### Autenticación
+
+Todos los endpoints requieren **autenticación vía JWT en cookies**. Incluir `credentials: 'include'` en todas las peticiones.
+
+```typescript
+fetch('/api/contribuyentes', { credentials: 'include' });
+```
+
+### Parámetros
+
+| Parámetro | Requerido | Descripción |
+|-----------|-----------|-------------|
+| `organizacion` | Opcional | Si no se envía, usa la organización activa del JWT |
+
+> **Nota**: Los parámetros `correo` y `correo_usuario` ya NO son necesarios. El backend los obtiene del JWT.
 
 ### Permisos por Rol
 
@@ -26,8 +40,10 @@ Todos los endpoints requieren:
 ### 1. Listar Contribuyentes (GET)
 
 ```
-GET /api/contribuyentes?correo=user@example.com&organizacion=MiOrg
+GET /api/contribuyentes?organizacion=MiOrg
 ```
+
+> Nota: `organizacion` es opcional si se quiere usar la organización activa del JWT.
 
 #### Respuesta Exitosa (200)
 
@@ -113,7 +129,6 @@ Content-Type: application/json
 
 ```json
 {
-  "correo_usuario": "admin@empresa.com",
   "organizacion": "MiEmpresa",
   "rfc": "XAXX010101000",
   "nombre": "Juan Pérez García",
@@ -141,8 +156,7 @@ Content-Type: application/json
 
 | Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `correo_usuario` | string | Email del usuario que crea |
-| `organizacion` | string | Nombre de la organización |
+| `organizacion` | string | Nombre de la organización (opcional) |
 | `rfc` | string | RFC del contribuyente (12-13 caracteres) |
 | `nombre` | string | Nombre o razón social |
 | `tipo_persona` | string | `fisica` o `moral` |
@@ -195,7 +209,6 @@ Content-Type: application/json
 
 ```json
 {
-  "correo_usuario": "admin@empresa.com",
   "organizacion": "MiEmpresa",
   "id_contribuyente": 1,
   "nombre": "Juan Pérez García Actualizado",
@@ -220,7 +233,6 @@ Content-Type: application/json
 
 ```json
 {
-  "correo_usuario": "admin@empresa.com",
   "organizacion": "MiEmpresa",
   "id_contribuyente": 1
 }
@@ -261,8 +273,7 @@ Content-Type: multipart/form-data
 
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
-| `correo` | string | ✅ | Email del usuario |
-| `organizacion` | string | ✅ | Nombre de la organización |
+| `organizacion` | string | ❌ | Nombre de la organización (opcional, usa JWT si no se envía) |
 | `contribuyente_id` | number | ✅ | ID del contribuyente |
 | `archivo_cer` | File | ❌* | Archivo .cer |
 | `archivo_key` | File | ❌* | Archivo .key |
@@ -271,18 +282,24 @@ Content-Type: multipart/form-data
 
 *Al menos uno de los archivos es requerido.
 
+> **Nota**: El parámetro `correo` ya NO es necesario. El backend lo obtiene del JWT.
+
 #### Ejemplo de Implementación React
 
 ```typescript
 const subirCertificados = async (
   contribuyenteId: number,
   archivoCer: File | null,
-  archivoKey: File | null
+  archivoKey: File | null,
+  organizacion?: string  // Opcional: si no se envía, usa la org activa del JWT
 ) => {
   const formData = new FormData();
-  formData.append('correo', 'admin@empresa.com');
-  formData.append('organizacion', 'MiEmpresa');
   formData.append('contribuyente_id', contribuyenteId.toString());
+
+  // organizacion es opcional
+  if (organizacion) {
+    formData.append('organizacion', organizacion);
+  }
 
   if (archivoCer) {
     formData.append('archivo_cer', archivoCer);
@@ -293,6 +310,7 @@ const subirCertificados = async (
 
   const response = await fetch('/api/contribuyentes/certificados', {
     method: 'POST',
+    credentials: 'include',  // Importante para enviar cookies JWT
     body: formData
   });
 
@@ -333,8 +351,10 @@ const subirCertificados = async (
 ### 6. Consultar Certificados (GET /certificados)
 
 ```
-GET /api/contribuyentes/certificados?correo=admin@empresa.com&organizacion=MiEmpresa&contribuyente_id=1
+GET /api/contribuyentes/certificados?organizacion=MiEmpresa&contribuyente_id=1
 ```
+
+> **Nota**: El parámetro `organizacion` es opcional. Si no se envía, usa la organización activa del JWT.
 
 #### Respuesta Exitosa (200)
 
@@ -376,7 +396,6 @@ Content-Type: application/json
 
 ```json
 {
-  "correo": "admin@empresa.com",
   "organizacion": "MiEmpresa",
   "contribuyente_id": 1,
   "eliminar_cer": true,
@@ -384,7 +403,10 @@ Content-Type: application/json
 }
 ```
 
-**Nota:** Solo administradores pueden eliminar certificados.
+**Notas:**
+- Solo administradores pueden eliminar certificados.
+- El parámetro `organizacion` es opcional (usa la org activa del JWT si no se envía).
+- El parámetro `correo` ya NO es necesario.
 
 ---
 
@@ -482,8 +504,7 @@ const CertificadoUploader = ({ contribuyenteId }: { contribuyenteId: number }) =
 
     try {
       const formData = new FormData();
-      formData.append('correo', 'admin@empresa.com');
-      formData.append('organizacion', 'MiEmpresa');
+      // organizacion es opcional - si no se envía, usa la org activa del JWT
       formData.append('contribuyente_id', contribuyenteId.toString());
 
       if (archivoCer) formData.append('archivo_cer', archivoCer);
@@ -491,6 +512,7 @@ const CertificadoUploader = ({ contribuyenteId }: { contribuyenteId: number }) =
 
       const response = await fetch('/api/contribuyentes/certificados', {
         method: 'POST',
+        credentials: 'include',  // Importante para enviar cookies JWT
         body: formData
       });
 
@@ -696,8 +718,7 @@ export interface ContribuyentesResponse {
 }
 
 export interface ContribuyenteCreateRequest {
-  correo_usuario: string;
-  organizacion: string;
+  organizacion?: string;  // Opcional: si no se envía, usa la org activa del JWT
   rfc: string;
   nombre: string;
   tipo_persona: TipoPersona;

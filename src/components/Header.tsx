@@ -1,10 +1,20 @@
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ChevronDown, Building2, Check } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const Header = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, switchOrganization } = useAuth();
+
+  const hasMultipleOrgs = user && user.organizaciones && user.organizaciones.length > 1;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border/50 shadow-sm">
@@ -17,18 +27,53 @@ export const Header = () => {
             Adquion
           </span>
         </Link>
-        
+
         <div className="flex items-center gap-3">
           {user ? (
             <>
-              <div className="flex flex-col items-end">
-                <span className="text-sm font-medium">
-                  {user.nombre}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {user.organizacion}
-                </span>
-              </div>
+              {/* Selector de Organización */}
+              {hasMultipleOrgs ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Building2 className="h-4 w-4" />
+                      <span className="max-w-[120px] truncate">
+                        {user.organizacionActiva?.nombre || 'Organización'}
+                      </span>
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Cambiar organización</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {user.organizaciones.map((org) => (
+                      <DropdownMenuItem
+                        key={org.database}
+                        onClick={() => switchOrganization(org.database)}
+                        className="flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-medium">{org.nombre}</span>
+                          <span className="text-xs text-muted-foreground capitalize">
+                            {org.rol}
+                          </span>
+                        </div>
+                        {user.organizacionActiva?.database === org.database && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <div className="flex flex-col items-end">
+                  <span className="text-sm font-medium">{user.nombre}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {user.organizacionActiva?.nombre}
+                  </span>
+                </div>
+              )}
+
               <Button variant="ghost" size="sm" onClick={logout}>
                 Cerrar Sesión
               </Button>

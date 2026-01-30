@@ -841,7 +841,6 @@ function ExecutionMonitor({
   onClose: () => void;
   onCancel: () => void;
 }) {
-  const { user } = useAuth();
   const [status, setStatus] = useState<ExecutionStatus | null>(null);
   const [phasesStatus, setPhasesStatus] = useState<Record<string, PhaseState>>({});
   const pollRef = useRef<NodeJS.Timeout | null>(null);
@@ -882,11 +881,10 @@ function ExecutionMonitor({
     try {
       const params = new URLSearchParams({
         execution_id: executionId,
-        correo: user?.correo || '',
-        organizacion: user?.organizacion || '',
       });
 
       const response = await fetch(`${API_URL}/automatizaciones/status?${params}`, {
+        credentials: 'include',
         headers: getHeaders()
       });
 
@@ -905,7 +903,7 @@ function ExecutionMonitor({
     } catch (err) {
       console.error('Error polling status:', err);
     }
-  }, [executionId, user?.correo, user?.organizacion]);
+  }, [executionId]);
 
   useEffect(() => {
     pollStatus();
@@ -922,10 +920,9 @@ function ExecutionMonitor({
     try {
       const response = await fetch(`${API_URL}/automatizaciones/ejecutar`, {
         method: 'DELETE',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify({
-          correo_admin: user?.correo,
-          organizacion: user?.organizacion,
           execution_id: executionId,
         }),
       });
@@ -1090,7 +1087,7 @@ function ExecutionMonitor({
 // ==================== COMPONENTE PRINCIPAL ====================
 
 export function AutomationsSection() {
-  const { user: currentUser } = useAuth();
+  const { user } = useAuth();
   const [scriptsDisponibles, setScriptsDisponibles] = useState<ScriptDisponible[]>([]);
   const [automatizaciones, setAutomatizaciones] = useState<Automatizacion[]>([]);
   const [logs, setLogs] = useState<LogEjecucion[]>([]);
@@ -1121,7 +1118,7 @@ export function AutomationsSection() {
     variables_personalizadas: {} as Record<string, string | number | boolean>,
   });
 
-  const isAdmin = currentUser?.tipo_usuario === 'administrador';
+  const isAdmin = user?.tipo_usuario === 'administrador';
 
   // ==================== EFECTOS ====================
 
@@ -1138,14 +1135,8 @@ export function AutomationsSection() {
 
   const cargarScriptsDisponibles = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) return;
-
-      const params = new URLSearchParams({
-        organizacion: currentUser.organizacion,
-        correo: currentUser.correo,
-      });
-
-      const response = await fetch(`${API_URL}/automatizaciones/disponibles?${params}`, {
+      const response = await fetch(`${API_URL}/automatizaciones/disponibles`, {
+        credentials: 'include',
         headers: getHeaders()
       });
 
@@ -1161,14 +1152,8 @@ export function AutomationsSection() {
 
   const cargarAutomatizaciones = async () => {
     try {
-      if (!currentUser?.correo || !currentUser?.organizacion) return;
-
-      const params = new URLSearchParams({
-        organizacion: currentUser.organizacion,
-        correo: currentUser.correo,
-      });
-
-      const response = await fetch(`${API_URL}/automatizaciones?${params}`, {
+      const response = await fetch(`${API_URL}/automatizaciones`, {
+        credentials: 'include',
         headers: getHeaders()
       });
 
@@ -1190,12 +1175,11 @@ export function AutomationsSection() {
   const cargarLogs = async (idAutomatizacion: number) => {
     try {
       const params = new URLSearchParams({
-        organizacion: currentUser?.organizacion || '',
-        correo: currentUser?.correo || '',
         id_automatizacion: String(idAutomatizacion),
       });
 
       const response = await fetch(`${API_URL}/automatizaciones/logs?${params}`, {
+        credentials: 'include',
         headers: getHeaders()
       });
 
@@ -1256,8 +1240,6 @@ export function AutomationsSection() {
       const nombreConPrefijo = nombreBase.startsWith('prod_') ? nombreBase : `prod_${nombreBase}`;
 
       const payload = {
-        correo_admin: currentUser?.correo,
-        organizacion: currentUser?.organizacion,
         nombre: nombreConPrefijo,
         descripcion: formConfig.descripcion,
         script_path: scriptSeleccionado.script_path,
@@ -1269,6 +1251,7 @@ export function AutomationsSection() {
 
       const response = await fetch(`${API_URL}/automatizaciones`, {
         method: 'POST',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify(payload),
       });
@@ -1298,10 +1281,9 @@ export function AutomationsSection() {
     try {
       const response = await fetch(`${API_URL}/automatizaciones`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify({
-          correo_admin: currentUser?.correo,
-          organizacion: currentUser?.organizacion,
           id_automatizacion: id,
           activo: !estadoActual,
         }),
@@ -1328,10 +1310,9 @@ export function AutomationsSection() {
     try {
       const response = await fetch(`${API_URL}/automatizaciones/ejecutar`, {
         method: 'POST',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify({
-          correo_admin: currentUser?.correo,
-          organizacion: currentUser?.organizacion,
           id_automatizacion: auto.id,
         }),
       });
@@ -1375,8 +1356,6 @@ export function AutomationsSection() {
 
     try {
       const payload = {
-        correo_admin: currentUser?.correo,
-        organizacion: currentUser?.organizacion,
         id_automatizacion: automatizacionSeleccionada.id,
         descripcion: formEdit.descripcion,
         cron_expresion: formEdit.cron_expresion,
@@ -1387,6 +1366,7 @@ export function AutomationsSection() {
 
       const response = await fetch(`${API_URL}/automatizaciones`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify(payload),
       });
@@ -1415,10 +1395,9 @@ export function AutomationsSection() {
     try {
       const response = await fetch(`${API_URL}/automatizaciones`, {
         method: 'DELETE',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify({
-          correo_admin: currentUser?.correo,
-          organizacion: currentUser?.organizacion,
           id_automatizacion: id,
         }),
       });

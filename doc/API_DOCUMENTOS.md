@@ -8,9 +8,23 @@ El endpoint `/api/documentos` permite gestionar documentos fiscales de contribuy
 
 ## Autenticación y Permisos
 
-Todos los endpoints requieren:
-- `correo`: Email del usuario autenticado
-- `organizacion`: Nombre de la organización
+> **IMPORTANTE**: Ver [CAMBIOS_SEGURIDAD_ORGANIZACIONES.md](./CAMBIOS_SEGURIDAD_ORGANIZACIONES.md) para la guía completa de migración.
+
+### Autenticación
+
+Todos los endpoints requieren **autenticación vía JWT en cookies**. Incluir `credentials: 'include'` en todas las peticiones.
+
+```typescript
+fetch('/api/documentos', { credentials: 'include' });
+```
+
+### Parámetros
+
+| Parámetro | Requerido | Descripción |
+|-----------|-----------|-------------|
+| `organizacion` | Opcional | Si no se envía, usa la organización activa del JWT |
+
+> **Nota**: El parámetro `correo` ya NO es necesario. El backend lo obtiene del JWT.
 
 ### Permisos por Rol
 
@@ -26,8 +40,10 @@ Todos los endpoints requieren:
 ### 1. Listar Documentos (GET)
 
 ```
-GET /api/documentos?correo=user@example.com&organizacion=MiOrg
+GET /api/documentos?organizacion=MiOrg
 ```
+
+> Nota: `organizacion` es opcional si se quiere usar la organización activa del JWT.
 
 #### Parámetros de Paginación
 
@@ -59,8 +75,7 @@ GET /api/documentos?correo=user@example.com&organizacion=MiOrg
 ```typescript
 // Obtener página 2, 10 documentos por página, filtrado por RFC y ordenado por nombre
 const params = new URLSearchParams({
-  correo: 'admin@empresa.com',
-  organizacion: 'MiEmpresa',
+  organizacion: 'MiEmpresa',  // Opcional
   page: '2',
   limit: '10',
   rfc: 'XAXX010101',
@@ -68,7 +83,9 @@ const params = new URLSearchParams({
   direccion: 'asc'
 });
 
-const response = await fetch(`/api/documentos?${params}`);
+const response = await fetch(`/api/documentos?${params}`, {
+  credentials: 'include'  // Requerido para enviar cookies JWT
+});
 const data = await response.json();
 ```
 
@@ -125,8 +142,7 @@ Content-Type: multipart/form-data
 | Campo | Tipo | Requerido | Descripción |
 |-------|------|-----------|-------------|
 | `archivo` | File | ✅ | Archivo a subir |
-| `correo` | string | ✅ | Email del usuario |
-| `organizacion` | string | ✅ | Nombre de la organización |
+| `organizacion` | string | ❌ | Nombre de la organización (opcional) |
 | `contribuyente_id` | number | ✅ | ID del contribuyente |
 | `tipo_documento` | string | ❌ | Tipo (factura, recibo, etc.) |
 
@@ -136,13 +152,13 @@ Content-Type: multipart/form-data
 const subirDocumento = async (file: File, contribuyenteId: number) => {
   const formData = new FormData();
   formData.append('archivo', file);
-  formData.append('correo', 'admin@empresa.com');
-  formData.append('organizacion', 'MiEmpresa');
   formData.append('contribuyente_id', contribuyenteId.toString());
   formData.append('tipo_documento', 'factura');
+  // organizacion es opcional - si no se envía, usa la org activa del JWT
 
   const response = await fetch('/api/documentos', {
     method: 'POST',
+    credentials: 'include',  // Requerido para enviar cookies JWT
     body: formData
     // NO incluir Content-Type, el browser lo agrega automáticamente con boundary
   });
@@ -182,7 +198,6 @@ Content-Type: application/json
 
 ```json
 {
-  "correo": "admin@empresa.com",
   "organizacion": "MiEmpresa",
   "documento_id": 42,
   "tipo_documento": "comprobante",
@@ -217,7 +232,17 @@ Content-Type: application/json
 ### 4. Eliminar Documento (DELETE)
 
 ```
-DELETE /api/documentos?correo=admin@empresa.com&organizacion=MiEmpresa&documento_id=42
+DELETE /api/documentos
+Content-Type: application/json
+```
+
+#### Body
+
+```json
+{
+  "organizacion": "MiEmpresa",
+  "documento_id": 42
+}
 ```
 
 #### Respuesta Exitosa (200)
@@ -234,8 +259,10 @@ DELETE /api/documentos?correo=admin@empresa.com&organizacion=MiEmpresa&documento
 ### 5. Descargar/Previsualizar Archivo (GET /archivo)
 
 ```
-GET /api/documentos/archivo?documento_id=42&correo=admin@empresa.com&organizacion=MiEmpresa&modo=preview
+GET /api/documentos/archivo?documento_id=42&organizacion=MiEmpresa&modo=preview
 ```
+
+> Nota: `organizacion` es opcional si se quiere usar la organización activa del JWT.
 
 #### Parámetros
 
@@ -251,7 +278,8 @@ GET /api/documentos/archivo?documento_id=42&correo=admin@empresa.com&organizacio
 
 ```typescript
 const DocumentPreview = ({ documentoId }: { documentoId: number }) => {
-  const url = `/api/documentos/archivo?documento_id=${documentoId}&correo=admin@empresa.com&organizacion=MiEmpresa&modo=preview`;
+  // Nota: Para iframes, las cookies se envían automáticamente si el dominio es el mismo
+  const url = `/api/documentos/archivo?documento_id=${documentoId}&modo=preview`;
 
   return (
     <iframe
@@ -267,13 +295,20 @@ const DocumentPreview = ({ documentoId }: { documentoId: number }) => {
 
 ```typescript
 const DownloadButton = ({ documentoId, nombreArchivo }: Props) => {
-  const handleDownload = () => {
-    const url = `/api/documentos/archivo?documento_id=${documentoId}&correo=admin@empresa.com&organizacion=MiEmpresa&modo=download`;
+  const handleDownload = async () => {
+    // Usar fetch con credentials para enviar cookies JWT
+    const response = await fetch(
+      `/api/documentos/archivo?documento_id=${documentoId}&modo=download`,
+      { credentials: 'include' }
+    );
 
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = nombreArchivo;
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   return <button onClick={handleDownload}>Descargar</button>;
@@ -320,12 +355,11 @@ interface Filters {
 }
 
 interface UseDocumentosOptions {
-  correo: string;
-  organizacion: string;
+  organizacion?: string;  // Opcional - usa org activa del JWT si no se especifica
   initialLimit?: number;
 }
 
-export function useDocumentos({ correo, organizacion, initialLimit = 20 }: UseDocumentosOptions) {
+export function useDocumentos({ organizacion, initialLimit = 20 }: UseDocumentosOptions) {
   const [documentos, setDocumentos] = useState<Documento[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [filters, setFilters] = useState<Filters>({});
@@ -338,11 +372,14 @@ export function useDocumentos({ correo, organizacion, initialLimit = 20 }: UseDo
 
     try {
       const params = new URLSearchParams({
-        correo,
-        organizacion,
         page: page.toString(),
         limit: initialLimit.toString(),
       });
+
+      // Agregar organizacion si se especificó
+      if (organizacion) {
+        params.append('organizacion', organizacion);
+      }
 
       // Agregar filtros activos
       Object.entries(filters).forEach(([key, value]) => {
@@ -351,7 +388,9 @@ export function useDocumentos({ correo, organizacion, initialLimit = 20 }: UseDo
         }
       });
 
-      const response = await fetch(`/api/documentos?${params}`);
+      const response = await fetch(`/api/documentos?${params}`, {
+        credentials: 'include'  // Requerido para enviar cookies JWT
+      });
       const data = await response.json();
 
       if (!data.success) {
@@ -414,8 +453,7 @@ export function DocumentosTable() {
     updateFilters,
     clearFilters,
   } = useDocumentos({
-    correo: 'admin@empresa.com',
-    organizacion: 'MiEmpresa',
+    organizacion: 'MiEmpresa',  // Opcional
     initialLimit: 20,
   });
 

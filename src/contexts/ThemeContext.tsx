@@ -70,7 +70,7 @@ interface ThemeContextType {
   setColorTheme: (theme: ColorTheme) => void;
   setAppearanceMode: (mode: AppearanceMode) => void;
   availableThemes: ThemeConfig[];
-  loadPreferencesFromServer: (correo: string, organizacion: string) => Promise<void>;
+  loadPreferencesFromServer: () => Promise<void>;
   isLoading: boolean;
 }
 
@@ -118,8 +118,8 @@ export function ThemeProvider({
   // Estado de carga
   const [isLoading, setIsLoading] = useState(false);
 
-  // Referencia para las credenciales del usuario actual
-  const [userCredentials, setUserCredentials] = useState<{ correo: string; organizacion: string } | null>(null);
+  // Estado para saber si el usuario está autenticado (preferencias cargadas)
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // Resolver el modo real basado en preferencias del sistema
   useEffect(() => {
@@ -163,15 +163,12 @@ export function ThemeProvider({
     newColorTheme: ColorTheme,
     newAppearanceMode: AppearanceMode
   ) => {
-    if (!userCredentials) return;
-
     try {
       const response = await fetch(`${API_URL}/usuarios/preferencias`, {
         method: 'PATCH',
+        credentials: 'include',
         headers: getHeaders(),
         body: JSON.stringify({
-          correo: userCredentials.correo,
-          organizacion: userCredentials.organizacion,
           color_theme: newColorTheme,
           appearance_mode: newAppearanceMode,
         }),
@@ -184,17 +181,17 @@ export function ThemeProvider({
     } catch (error) {
       console.error('❌ Error de conexión al guardar preferencias:', error);
     }
-  }, [userCredentials]);
+  }, []);
 
   // Función para cargar preferencias desde el servidor
-  const loadPreferencesFromServer = useCallback(async (correo: string, organizacion: string) => {
+  const loadPreferencesFromServer = useCallback(async () => {
     setIsLoading(true);
-    setUserCredentials({ correo, organizacion });
 
     try {
-      const url = `${API_URL}/usuarios/preferencias?correo=${encodeURIComponent(correo)}&organizacion=${encodeURIComponent(organizacion)}`;
+      const url = `${API_URL}/usuarios/preferencias`;
       const response = await fetch(url, {
         method: 'GET',
+        credentials: 'include',
         headers: getHeaders(),
       });
 
@@ -215,6 +212,7 @@ export function ThemeProvider({
           localStorage.setItem(STORAGE_KEY_MODE, appearance_mode);
         }
 
+        setIsAuthenticated(true);
         console.log('✅ Preferencias cargadas del servidor:', result.data);
       }
     } catch (error) {
@@ -229,8 +227,8 @@ export function ThemeProvider({
   const setColorTheme = (theme: ColorTheme) => {
     setColorThemeState(theme);
     localStorage.setItem(STORAGE_KEY_COLOR, theme);
-    // Guardar en servidor si hay credenciales
-    if (userCredentials) {
+    // Guardar en servidor si el usuario está autenticado
+    if (isAuthenticated) {
       savePreferencesToServer(theme, appearanceMode);
     }
   };
@@ -238,8 +236,8 @@ export function ThemeProvider({
   const setAppearanceMode = (mode: AppearanceMode) => {
     setAppearanceModeState(mode);
     localStorage.setItem(STORAGE_KEY_MODE, mode);
-    // Guardar en servidor si hay credenciales
-    if (userCredentials) {
+    // Guardar en servidor si el usuario está autenticado
+    if (isAuthenticated) {
       savePreferencesToServer(colorTheme, mode);
     }
   };

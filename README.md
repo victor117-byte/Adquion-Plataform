@@ -327,7 +327,6 @@ Este proyecto es **propietario**. Todos los derechos reservados.
 
 ## 🙏 Agradecimientos
 
-- [Lovable](https://lovable.dev)
 - [shadcn/ui](https://ui.shadcn.com)
 - [Radix UI](https://www.radix-ui.com)
 - [Tailwind CSS](https://tailwindcss.com)
