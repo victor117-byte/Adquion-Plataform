@@ -118,7 +118,11 @@ export function useSubscription() {
 
   const upgradePlan = async (planId: string) => {
     try {
-      const response = await post<CheckoutResponse>('/stripe/checkout', { plan_id: planId });
+      const response = await post<CheckoutResponse>('/stripe/checkout', {
+        plan_id: planId,
+        success_url: `${window.location.origin}/main?section=subscription&success=true`,
+        cancel_url: `${window.location.origin}/main?section=subscription&canceled=true`
+      });
       if (response.success && response.data.checkout_url) {
         window.location.href = response.data.checkout_url;
       }

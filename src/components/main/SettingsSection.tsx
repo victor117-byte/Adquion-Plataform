@@ -475,6 +475,7 @@ export function SettingsSection() {
                 </Button>
               </div>
             ) : (
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -522,6 +523,7 @@ export function SettingsSection() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             )}
           </Card>
         </TabsContent>

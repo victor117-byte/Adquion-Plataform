@@ -1,0 +1,13 @@
+4. Datos de Prueba para Stripe
+En el checkout de Stripe, usa estas tarjetas de prueba:
+
+Tarjeta	Número	Resultado
+Pago exitoso	4242 4242 4242 4242	Aprobada
+Tarjeta rechazada	4000 0000 0000 0002	Rechazada
+3D Secure	4000 0000 0000 3220	Requiere autenticación
+Para todos los casos:
+
+Fecha de expiración: Cualquier fecha futura (ej: 12/28)
+CVC: Cualquier 3 dígitos (ej: 123)
+Código postal: Cualquier número (ej: 12345)
+Nombre: Cualquier nombre

@@ -99,7 +99,7 @@ export function SubscriptionSection() {
                 <CardDescription>
                   {subscription.plan_name}
                   {subscription.cancel_at_period_end && (
-                    <span className="text-yellow-600 dark:text-yellow-500 ml-2">
+                    <span className="text-warning ml-2">
                       (Se cancelará pronto)
                     </span>
                   )}
@@ -143,7 +143,7 @@ export function SubscriptionSection() {
                   size="sm"
                   onClick={handleReactivate}
                   disabled={processingAction === 'reactivate'}
-                  className="text-green-600 hover:text-green-700"
+                  className="text-success hover:text-success/80"
                 >
                   {processingAction === 'reactivate' && (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -243,7 +243,7 @@ function PlanCard({ plan, isProcessing, onUpgrade, icon: Icon }: PlanCardProps) 
         <ul className="space-y-3">
           {plan.features.map((feature, index) => (
             <li key={index} className="flex items-start gap-2 text-sm">
-              <Check className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+              <Check className="h-4 w-4 text-success mt-0.5 shrink-0" />
               <span>{feature}</span>
             </li>
           ))}

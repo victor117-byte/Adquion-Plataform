@@ -70,12 +70,16 @@ export function UsersSection() {
     tipo_usuario: 'contador' as 'administrador' | 'contador',
   });
 
+  const currentDatabase = currentUser?.organizacionActiva?.database;
+
   useEffect(() => {
-    fetchUsers();
-  }, [currentUser]);
+    if (currentDatabase) {
+      fetchUsers();
+    }
+  }, [currentDatabase]);
 
   const fetchUsers = async () => {
-    if (!currentUser?.organizacionActiva?.database) return;
+    if (!currentDatabase) return;
 
     try {
       setLoading(true);
@@ -113,7 +117,7 @@ export function UsersSection() {
         await patch('/auth/users', {
           id_usuario: editingUser.id,
           tipo_usuario: formData.tipo_usuario,
-          database: currentUser?.organizacionActiva?.database,
+          database: currentDatabase,
         });
 
         toast({
@@ -151,7 +155,7 @@ export function UsersSection() {
           fecha_nacimiento: formData.fecha_nacimiento,
           telefono: formData.telefono,
           tipo_usuario: formData.tipo_usuario,
-          database: currentUser?.organizacionActiva?.database,
+          database: currentDatabase,
         });
 
         toast({
@@ -181,7 +185,7 @@ export function UsersSection() {
     try {
       await del('/auth/users', {
         id_usuario: userId,
-        database: currentUser?.organizacionActiva?.database,
+        database: currentDatabase,
       });
 
       toast({
@@ -232,14 +236,14 @@ export function UsersSection() {
   const getRoleBadge = (tipo: string) => {
     if (tipo === 'administrador') {
       return (
-        <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+        <Badge className="bg-destructive/10 text-destructive border-destructive/20">
           <Shield className="h-3 w-3 mr-1" />
           Administrador
         </Badge>
       );
     }
     return (
-      <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+      <Badge className="bg-info/10 text-info border-info/20">
         <UserCheck className="h-3 w-3 mr-1" />
         Contador
       </Badge>
@@ -394,38 +398,91 @@ export function UsersSection() {
         </div>
       </Card>
 
-      {/* Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>Correo</TableHead>
-              <TableHead>Teléfono</TableHead>
-              <TableHead>Tipo</TableHead>
-              {userRole === 'administrador' && (
-                <TableHead className="text-right">Acciones</TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={userRole === 'administrador' ? 5 : 4} className="text-center py-8">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                    <span>Cargando usuarios...</span>
+      {/* Loading State */}
+      {loading && (
+        <Card className="p-8">
+          <div className="flex items-center justify-center gap-2">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span>Cargando usuarios...</span>
+          </div>
+        </Card>
+      )}
+
+      {/* Empty State */}
+      {!loading && filteredUsers.length === 0 && (
+        <Card className="p-8 text-center text-muted-foreground">
+          {searchQuery ? 'No se encontraron usuarios' : 'No hay usuarios registrados'}
+        </Card>
+      )}
+
+      {/* Mobile Cards View */}
+      {!loading && filteredUsers.length > 0 && (
+        <div className="space-y-3 md:hidden">
+          {filteredUsers.map((user) => (
+            <Card key={user.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-foreground truncate">
+                      {user.nombre}
+                    </span>
+                    {getRoleBadge(user.tipo_usuario)}
                   </div>
-                </TableCell>
-              </TableRow>
-            ) : filteredUsers.length === 0 ? (
+                  <div className="space-y-1 text-sm text-muted-foreground">
+                    <p className="truncate">{user.correo}</p>
+                    <p>{user.telefono}</p>
+                  </div>
+                </div>
+                {userRole === 'administrador' && user.correo !== currentUser?.correo && (
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => openEditDialog(user)}
+                      title="Editar rol"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteUser(user.id)}
+                      title="Eliminar usuario"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                {userRole === 'administrador' && user.correo === currentUser?.correo && (
+                  <Badge variant="outline" className="shrink-0 text-xs">
+                    Tu cuenta
+                  </Badge>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Desktop Table View */}
+      {!loading && filteredUsers.length > 0 && (
+        <Card className="hidden md:block overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={userRole === 'administrador' ? 5 : 4} className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? 'No se encontraron usuarios' : 'No hay usuarios registrados'}
-                </TableCell>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Correo</TableHead>
+                <TableHead>Teléfono</TableHead>
+                <TableHead>Tipo</TableHead>
+                {userRole === 'administrador' && (
+                  <TableHead className="text-right">Acciones</TableHead>
+                )}
               </TableRow>
-            ) : (
-              filteredUsers.map((user) => (
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">{user.nombre}</TableCell>
                   <TableCell>{user.correo}</TableCell>
@@ -461,11 +518,11 @@ export function UsersSection() {
                     </TableCell>
                   )}
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
     </div>
   );
 }

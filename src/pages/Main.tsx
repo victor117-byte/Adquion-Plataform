@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 import {
   LayoutDashboard,
   Users,
@@ -65,7 +66,8 @@ const navItems: NavItem[] = [
 
 export default function Main() {
   const { user, logout, loading, switchOrganization } = useAuth();
-  const { isFree, loading: subLoading } = useSubscription();
+  const { isFree, loading: subLoading, refresh: refreshSubscription } = useSubscription();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeSection, setActiveSection] = useState<SectionType>('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -73,10 +75,79 @@ export default function Main() {
   const [checkingReportes, setCheckingReportes] = useState(true);
 
   const hasMultipleOrgs = user && user.organizaciones && user.organizaciones.length > 1;
+  const currentDatabase = user?.organizacionActiva?.database;
+
+  // Leer sección y parámetros de pago desde URL query params
+  useEffect(() => {
+    const sectionParam = searchParams.get('section') as SectionType | null;
+    const success = searchParams.get('success');
+    const canceled = searchParams.get('canceled');
+
+    // Cambiar a la sección indicada
+    if (sectionParam && navItems.some(item => item.id === sectionParam)) {
+      setActiveSection(sectionParam);
+    }
+
+    // Sincronizar suscripción después de pago exitoso
+    if (success === 'true') {
+      const syncSubscription = async () => {
+        try {
+          const API_URL = import.meta.env.VITE_API_URL || '/api';
+          const response = await fetch(`${API_URL}/stripe/sync`, {
+            method: 'POST',
+            credentials: 'include'
+          });
+          const data = await response.json();
+
+          if (data.success && data.data.synced) {
+            toast({
+              title: '¡Bienvenido al plan ' + data.data.plan_name + '!',
+              description: 'Tu suscripción ha sido actualizada correctamente',
+            });
+            // Recargar datos de suscripción
+            refreshSubscription();
+          } else {
+            toast({
+              title: 'Pago exitoso',
+              description: 'Tu suscripción ha sido procesada',
+            });
+            refreshSubscription();
+          }
+        } catch (error) {
+          console.error('Error sincronizando suscripción:', error);
+          toast({
+            title: 'Pago exitoso',
+            description: 'Tu suscripción ha sido actualizada',
+          });
+          refreshSubscription();
+        }
+      };
+      syncSubscription();
+    } else if (canceled === 'true') {
+      toast({
+        title: 'Pago cancelado',
+        description: 'El proceso de pago fue cancelado',
+        variant: 'destructive',
+      });
+    }
+
+    // Limpiar todos los parámetros de la URL
+    if (sectionParam || success || canceled) {
+      searchParams.delete('section');
+      searchParams.delete('success');
+      searchParams.delete('canceled');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, refreshSubscription]);
 
   useEffect(() => {
     // Verificar si hay reportes disponibles
     const checkReportes = async () => {
+      if (!currentDatabase) {
+        setCheckingReportes(false);
+        return;
+      }
+
       try {
         const API_URL = import.meta.env.VITE_API_URL || '/api';
         const response = await fetch(
@@ -100,7 +171,7 @@ export default function Main() {
     };
 
     checkReportes();
-  }, [user]);
+  }, [currentDatabase]);
 
   if (loading || checkingReportes || subLoading) {
     return (

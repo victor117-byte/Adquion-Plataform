@@ -84,8 +84,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [checkSession]);
 
   // Configurar refresh automático cada 10 minutos
+  const isAuthenticated = !!user;
   useEffect(() => {
-    if (!user) return;
+    if (!isAuthenticated) return;
 
     const interval = setInterval(async () => {
       try {
@@ -96,7 +97,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }, 10 * 60 * 1000); // 10 minutos
 
     return () => clearInterval(interval);
-  }, [user]);
+  }, [isAuthenticated]);
 
   const login = async (correo: string, contraseña: string) => {
     try {

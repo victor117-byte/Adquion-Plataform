@@ -1756,7 +1756,7 @@ export function ContributorsSection() {
       </Card>
 
       {/* Table */}
-      <Card>
+      <Card className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

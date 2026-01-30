@@ -134,7 +134,7 @@ export function PlanLimitsCard({ onUpgradeClick }: PlanLimitsCardProps) {
                     <AlertTriangle
                       className={cn(
                         'h-3.5 w-3.5',
-                        isAtLimit ? 'text-destructive' : 'text-yellow-500'
+                        isAtLimit ? 'text-destructive' : 'text-warning'
                       )}
                     />
                   )}
@@ -142,7 +142,7 @@ export function PlanLimitsCard({ onUpgradeClick }: PlanLimitsCardProps) {
                     className={cn(
                       'font-medium',
                       isAtLimit && 'text-destructive',
-                      showAlert && !isAtLimit && 'text-yellow-600 dark:text-yellow-500'
+                      showAlert && !isAtLimit && 'text-warning'
                     )}
                   >
                     {item.current}
@@ -159,7 +159,7 @@ export function PlanLimitsCard({ onUpgradeClick }: PlanLimitsCardProps) {
                 className={cn(
                   'h-1.5',
                   isAtLimit && '[&>div]:bg-destructive',
-                  showAlert && !isAtLimit && '[&>div]:bg-yellow-500'
+                  showAlert && !isAtLimit && '[&>div]:bg-warning'
                 )}
               />
             </div>

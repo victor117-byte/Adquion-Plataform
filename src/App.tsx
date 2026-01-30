@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Main from "./pages/Main";
 import Onboarding from "./pages/Onboarding";
+import BillingRedirect from "./pages/BillingRedirect";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -18,12 +19,13 @@ const queryClient = new QueryClient();
 const ThemeSync = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth();
   const { loadPreferencesFromServer } = useTheme();
+  const userId = user?.userId;
 
   useEffect(() => {
-    if (user) {
+    if (userId) {
       loadPreferencesFromServer();
     }
-  }, [user, loadPreferencesFromServer]);
+  }, [userId, loadPreferencesFromServer]);
 
   return <>{children}</>;
 };
@@ -42,6 +44,8 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/main" element={<Main />} />
+                {/* Redirección desde Stripe Checkout */}
+                <Route path="/dashboard/billing" element={<BillingRedirect />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

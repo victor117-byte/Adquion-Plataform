@@ -40,21 +40,21 @@ const recentActivity = [
     title: "Documento procesado: Factura-2025-001.pdf",
     time: "Hace 2 horas",
     status: "Completado",
-    statusColor: "text-green-600",
+    statusColor: "text-success",
   },
   {
     id: 2,
     title: "Nuevo contribuyente agregado: Empresa ABC S.A.",
     time: "Hace 5 horas",
     status: "Nuevo",
-    statusColor: "text-blue-600",
+    statusColor: "text-info",
   },
   {
     id: 3,
     title: "Automatización SAT ejecutada",
     time: "Hace 8 horas",
     status: "Exitoso",
-    statusColor: "text-green-600",
+    statusColor: "text-success",
   },
   {
     id: 4,
@@ -98,7 +98,7 @@ export function DashboardSection() {
             </div>
             <p className="text-2xl font-bold text-foreground">{stat.value}</p>
             <p className={`text-sm mt-1 ${
-              stat.changeType === 'positive' ? 'text-green-600' : 'text-muted-foreground'
+              stat.changeType === 'positive' ? 'text-success' : 'text-muted-foreground'
             }`}>
               {stat.change}
             </p>
@@ -141,7 +141,7 @@ export function DashboardSection() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Conexión SAT</span>
-              <span className="text-sm font-medium text-green-600">Activa</span>
+              <span className="text-sm font-medium text-success">Activa</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Última sincronización</span>
@@ -149,7 +149,7 @@ export function DashboardSection() {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Notificaciones</span>
-              <span className="text-sm font-medium text-green-600">Habilitadas</span>
+              <span className="text-sm font-medium text-success">Habilitadas</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Plan actual</span>
