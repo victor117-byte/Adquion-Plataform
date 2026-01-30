@@ -52,15 +52,39 @@ interface NavItem {
   freeOnly?: boolean;
 }
 
+
+// Control centralizado de permisos de menú por rol
+const menuPermissions: Record<string, SectionType[]> = {
+  administrador: [
+    'dashboard',
+    'users',
+    'contributors',
+    'documents',
+    'automations',
+    'notifications',
+    'powerbi',
+    'settings',
+    'subscription',
+  ],
+  contador: [
+    'dashboard',
+    'contributors',
+    'documents',
+    // 'automations',
+    'notifications',
+    'powerbi',
+  ],
+};
+
 const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'users', label: 'Usuarios', icon: Users, adminOnly: true },
+  { id: 'users', label: 'Usuarios', icon: Users },
   { id: 'contributors', label: 'Contribuyentes', icon: UserCheck },
   { id: 'documents', label: 'Documentos', icon: FileText },
   { id: 'automations', label: 'Automatizaciones', icon: Zap },
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
   { id: 'powerbi', label: 'Reportes', icon: BarChart3 },
-  { id: 'settings', label: 'Configuración', icon: Settings, adminOnly: true },
+  { id: 'settings', label: 'Configuración', icon: Settings },
   { id: 'subscription', label: 'Planes', icon: CreditCard, freeOnly: true },
 ];
 
@@ -187,17 +211,15 @@ export default function Main() {
 
   const isAdmin = user.tipo_usuario === 'administrador';
 
-  // Filtrar items del menú según permisos y disponibilidad
+  // Filtrar items del menú según permisos definidos en menuPermissions
+  const allowedSections = menuPermissions[user.tipo_usuario] || [];
   const filteredNavItems = navItems.filter(item => {
-    // Filtrar items solo para admin
-    if (item.adminOnly && !isAdmin) return false;
-
+    // Solo mostrar si está permitido para el rol
+    if (!allowedSections.includes(item.id)) return false;
     // Ocultar Reportes si no hay reportes configurados
     if (item.id === 'powerbi' && !hasReportes) return false;
-
     // Mostrar Planes solo para usuarios free
     if (item.freeOnly && !isFree) return false;
-
     return true;
   });
 
