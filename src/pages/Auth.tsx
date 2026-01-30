@@ -1,4 +1,29 @@
 import { useState } from "react";
+// Utilidades de validación
+const passwordRequirements = [
+  { label: "Al menos 8 caracteres", test: (v: string) => v.length >= 8 },
+  { label: "Una mayúscula", test: (v: string) => /[A-Z]/.test(v) },
+  { label: "Una minúscula", test: (v: string) => /[a-z]/.test(v) },
+  { label: "Un número", test: (v: string) => /\d/.test(v) },
+  { label: "Un símbolo", test: (v: string) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?\s]/.test(v) },
+];
+
+function isPasswordStrong(pw: string) {
+  return passwordRequirements.every(r => r.test(pw));
+}
+
+function isValidBirthDate(date: string) {
+  if (!date) return false;
+  const d = new Date(date);
+  const hoy = new Date();
+  if (d > hoy) return false;
+  const edad = hoy.getFullYear() - d.getFullYear();
+  const m = hoy.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < d.getDate())) {
+    return edad - 1 >= 18;
+  }
+  return edad >= 18;
+}
 import { Link, useSearchParams, Navigate } from "react-router-dom";
 import { BarChart3, Loader2, Mail, Lock, User, Phone, Calendar, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +47,8 @@ export default function Auth() {
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [touched, setTouched] = useState<{ [k: string]: boolean }>({});
 
   const [loading, setLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
@@ -42,6 +69,8 @@ export default function Auth() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched({ organizacion: true, nombre: true, correo: true, telefono: true, fechaNacimiento: true, contraseña: true });
+    if (!isPasswordStrong(contraseña) || !isValidBirthDate(fechaNacimiento)) return;
     setLoading(true);
     try {
       await register({
@@ -243,9 +272,13 @@ export default function Auth() {
                         placeholder="5551234567"
                         value={telefono}
                         onChange={(e) => setTelefono(e.target.value)}
-                        className="pl-10"
+                        className={`pl-10 ${touched.telefono && telefono.length < 8 ? 'border-red-500' : ''}`}
                         required
+                        onBlur={() => setTouched(t => ({ ...t, telefono: true }))}
                       />
+                      {touched.telefono && telefono.length < 8 && (
+                        <p className="text-xs text-red-500 mt-1">Teléfono inválido</p>
+                      )}
                     </div>
                   </div>
 
@@ -258,9 +291,14 @@ export default function Auth() {
                         type="date"
                         value={fechaNacimiento}
                         onChange={(e) => setFechaNacimiento(e.target.value)}
-                        className="pl-10"
+                        className={`pl-10 ${touched.fechaNacimiento && !isValidBirthDate(fechaNacimiento) ? 'border-red-500' : ''}`}
                         required
+                        onBlur={() => setTouched(t => ({ ...t, fechaNacimiento: true }))}
+                        max={new Date().toISOString().split('T')[0]}
                       />
+                      {touched.fechaNacimiento && !isValidBirthDate(fechaNacimiento) && (
+                        <p className="text-xs text-red-500 mt-1">Debes ser mayor de 18 años y la fecha debe ser válida</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -271,19 +309,40 @@ export default function Auth() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="signup-password"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={contraseña}
                       onChange={(e) => setContraseña(e.target.value)}
-                      className="pl-10"
+                      className={`pl-10 ${touched.contraseña && !isPasswordStrong(contraseña) ? 'border-red-500' : ''}`}
                       required
                       minLength={8}
+                      onBlur={() => setTouched(t => ({ ...t, contraseña: true }))}
                     />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground"
+                      tabIndex={-1}
+                      onClick={() => setShowPassword(v => !v)}
+                    >
+                      {showPassword ? 'Ocultar' : 'Ver'}
+                    </button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Mínimo 8 caracteres</p>
+                  <ul className="text-xs mt-2 space-y-1">
+                    {passwordRequirements.map(req => (
+                      <li key={req.label} className={req.test(contraseña) ? 'text-green-600' : 'text-red-500'}>
+                        {req.test(contraseña) ? '✔' : '✖'} {req.label}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
-                <Button type="submit" variant="hero" className="w-full" size="lg" disabled={loading}>
+                <Button
+                  type="submit"
+                  variant="hero"
+                  className="w-full"
+                  size="lg"
+                  disabled={loading || !isPasswordStrong(contraseña) || !isValidBirthDate(fechaNacimiento)}
+                >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Crear Cuenta
                 </Button>
