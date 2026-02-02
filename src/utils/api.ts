@@ -6,6 +6,7 @@
  */
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
+const IS_DEV = import.meta.env.DEV;
 
 // ==================== HEADERS ====================
 
@@ -14,9 +15,12 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api';
  * @param includeContentType - Si incluir Content-Type JSON (default: true)
  */
 export function getHeaders(includeContentType: boolean = true): Record<string, string> {
-  const headers: Record<string, string> = {
-    'ngrok-skip-browser-warning': 'true',
-  };
+  const headers: Record<string, string> = {};
+
+  // Solo incluir ngrok header en desarrollo (evita error CORS en producción)
+  if (IS_DEV) {
+    headers['ngrok-skip-browser-warning'] = 'true';
+  }
 
   if (includeContentType) {
     headers['Content-Type'] = 'application/json';

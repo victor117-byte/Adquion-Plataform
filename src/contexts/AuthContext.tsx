@@ -9,6 +9,7 @@ export interface Organizacion {
   nombre: string;
   database: string;
   rol: 'administrador' | 'contador';
+  esActiva?: boolean;
 }
 
 export interface User {
@@ -196,19 +197,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const response = await fetchAPI<{
         success: boolean;
         message: string;
-        data: { organizacionActiva: { nombre: string; database: string } };
-      }>('/auth/me', {
-        method: 'PATCH',
+        data: {
+          organizacionActiva: { nombre: string; database: string };
+          organizaciones?: Organizacion[];
+        };
+      }>('/auth/switch-organization', {
+        method: 'POST',
         body: JSON.stringify({ database }),
       });
 
       if (response.success && response.data) {
+        const newRol = user?.organizaciones.find(o => o.database === database)?.rol;
+
         setUser((prev) =>
           prev
             ? {
                 ...prev,
                 organizacionActiva: response.data.organizacionActiva,
-                tipo_usuario: prev.organizaciones.find(o => o.database === database)?.rol || prev.tipo_usuario,
+                tipo_usuario: newRol || prev.tipo_usuario,
+                organizaciones: response.data.organizaciones || prev.organizaciones,
               }
             : null
         );
@@ -217,6 +224,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           title: 'Organización cambiada',
           description: `Ahora estás en ${response.data.organizacionActiva.nombre}`,
         });
+
+        // Recargar la página para aplicar el cambio de contexto
+        window.location.reload();
       }
     } catch (error) {
       console.error('Error cambiando organización:', error);
