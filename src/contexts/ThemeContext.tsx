@@ -1,17 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { API_URL, getHeaders } from '@/utils/api';
 
 // Definición de los temas disponibles
 export type ColorTheme = 'default' | 'emerald' | 'rose' | 'amber' | 'violet' | 'slate';
 export type AppearanceMode = 'light' | 'dark' | 'system';
-
-// API URL
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-
-// Headers para las peticiones
-const getHeaders = () => ({
-  'Content-Type': 'application/json',
-  'ngrok-skip-browser-warning': 'true',
-});
 
 interface ThemeConfig {
   id: ColorTheme;
@@ -167,7 +159,7 @@ export function ThemeProvider({
       const response = await fetch(`${API_URL}/usuarios/preferencias`, {
         method: 'PATCH',
         credentials: 'include',
-        headers: getHeaders(),
+        headers: getHeaders(true),
         body: JSON.stringify({
           color_theme: newColorTheme,
           appearance_mode: newAppearanceMode,
@@ -192,7 +184,7 @@ export function ThemeProvider({
       const response = await fetch(url, {
         method: 'GET',
         credentials: 'include',
-        headers: getHeaders(),
+        headers: getHeaders(true),
       });
 
       const result = await response.json();
