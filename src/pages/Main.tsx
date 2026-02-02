@@ -358,7 +358,9 @@ export default function Main() {
               className={cn(
                 "w-full justify-start text-base md:text-sm h-12 md:h-10",
                 sidebarCollapsed && "md:justify-center md:px-2",
-                item.freeOnly && "text-primary"
+                item.freeOnly && "text-primary",
+                activeSection === item.id && item.id === 'subscription' &&
+                  "bg-white border border-primary text-primary shadow-sm hover:bg-primary hover:text-white"
               )}
               onClick={() => {
                 setActiveSection(item.id);
@@ -366,7 +368,11 @@ export default function Main() {
               }}
               title={sidebarCollapsed ? item.label : undefined}
             >
-              <item.icon className={cn("h-5 w-5 md:h-4 md:w-4", (!sidebarCollapsed || mobileMenuOpen) && "mr-3")} />
+              <item.icon className={cn(
+                "h-5 w-5 md:h-4 md:w-4",
+                (!sidebarCollapsed || mobileMenuOpen) && "mr-3",
+                activeSection === item.id && item.id === 'subscription' && "text-primary"
+              )} />
               {(!sidebarCollapsed || mobileMenuOpen) && (
                 <>
                   <span>{item.label}</span>
