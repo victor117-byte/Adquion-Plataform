@@ -1755,8 +1755,8 @@ export function ContributorsSection() {
         </div>
       </Card>
 
-      {/* Table */}
-      <Card className="overflow-x-auto">
+      {/* Desktop Table - Hidden on mobile */}
+      <Card className="overflow-x-auto hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -1874,6 +1874,76 @@ export function ContributorsSection() {
           </TableBody>
         </Table>
       </Card>
+
+      {/* Mobile Cards - Shown only on mobile */}
+      <div className="md:hidden space-y-3">
+        {filteredContribuyentes.length === 0 ? (
+          <Card className="p-8 text-center">
+            <Building2 className="h-12 w-12 text-muted-foreground/50 mx-auto mb-3" />
+            <p className="text-muted-foreground">
+              {searchQuery ? 'No se encontraron contribuyentes' : 'No hay contribuyentes registrados'}
+            </p>
+            {!searchQuery && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => { setEditingContributor(null); setDialogFormOpen(true); }}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Agregar primero
+              </Button>
+            )}
+          </Card>
+        ) : (
+          filteredContribuyentes.map((contribuyente) => (
+            <Card 
+              key={contribuyente.id} 
+              className="p-4 cursor-pointer active:bg-muted/50 transition-colors"
+              onClick={() => openDetailDialog(contribuyente)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <div className="p-2 rounded-lg bg-primary/10 shrink-0">
+                    {contribuyente.tipo_persona === 'moral' ? (
+                      <Building2 className="h-5 w-5 text-primary" />
+                    ) : (
+                      <User className="h-5 w-5 text-primary" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-medium text-foreground truncate">{contribuyente.nombre}</h4>
+                    <p className="text-xs font-mono text-muted-foreground mt-0.5">{contribuyente.rfc}</p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {getTipoPersonaBadge(contribuyente.tipo_persona)}
+                      {getStatusBadge(contribuyente.estado)}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(contribuyente)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  {isAdmin && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive" 
+                      onClick={() => handleDeleteContributor(contribuyente.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t text-xs text-muted-foreground">
+                <UserCheck className="h-3.5 w-3.5" />
+                <span className="truncate">{contribuyente.usuario_asignado_nombre}</span>
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
 
       {/* Diálogo de Detalle */}
       <ContribuyenteDetailDialog
