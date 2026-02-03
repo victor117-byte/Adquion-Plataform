@@ -166,24 +166,24 @@ export function NotificationsSection() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-foreground">Notificaciones</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Notificaciones</h1>
             {unreadCount > 0 && (
               <Badge className="bg-primary text-primary-foreground">
                 {unreadCount} sin leer
               </Badge>
             )}
           </div>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Historial de notificaciones y alertas
           </p>
         </div>
         {unreadCount > 0 && (
-          <Button variant="outline" onClick={handleMarkAllAsRead}>
+          <Button variant="outline" onClick={handleMarkAllAsRead} className="w-full sm:w-auto">
             <Check className="h-4 w-4 mr-2" />
             Marcar todo como leído
           </Button>
@@ -191,11 +191,11 @@ export function NotificationsSection() {
       </div>
 
       {/* Filters */}
-      <Card className="p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <Card className="p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="flex gap-2 flex-1">
             <Select value={filterChannel} onValueChange={setFilterChannel}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="flex-1 sm:w-40 sm:flex-none">
                 <Filter className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Canal" />
               </SelectTrigger>
@@ -207,7 +207,7 @@ export function NotificationsSection() {
               </SelectContent>
             </Select>
             <Select value={filterRead} onValueChange={setFilterRead}>
-              <SelectTrigger className="w-36">
+              <SelectTrigger className="flex-1 sm:w-36 sm:flex-none">
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>
@@ -222,12 +222,12 @@ export function NotificationsSection() {
 
       {/* Notifications List */}
       {loading ? (
-        <div className="text-center py-8">Cargando notificaciones...</div>
+        <div className="text-center py-8 text-sm sm:text-base">Cargando notificaciones...</div>
       ) : filteredNotifications.length === 0 ? (
-        <Card className="p-8 text-center">
-          <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No hay notificaciones</h3>
-          <p className="text-muted-foreground">
+        <Card className="p-6 sm:p-8 text-center">
+          <Bell className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-base sm:text-lg font-semibold mb-2">No hay notificaciones</h3>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Las notificaciones aparecerán aquí
           </p>
         </Card>
@@ -237,39 +237,40 @@ export function NotificationsSection() {
             <Card 
               key={notification.id} 
               className={cn(
-                "p-4 transition-colors",
+                "p-3 sm:p-4 transition-colors",
                 !notification.read && "bg-primary/5 border-primary/20"
               )}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3 sm:gap-4">
                 <div className={cn(
-                  "p-2 rounded-lg",
+                  "p-1.5 sm:p-2 rounded-lg shrink-0",
                   notification.read ? "bg-muted" : "bg-primary/10"
                 )}>
                   {getChannelIcon(notification.channel)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
                     <h3 className={cn(
-                      "font-medium",
+                      "font-medium text-sm sm:text-base",
                       !notification.read && "text-foreground"
                     )}>
                       {notification.title}
                     </h3>
                     {getTypeBadge(notification.type)}
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2">
+                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                     {notification.message}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-2">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
                     {formatDate(notification.created_at)}
                   </p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
                   {!notification.read && (
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="h-8 w-8 p-0"
                       onClick={() => handleMarkAsRead(notification.id)}
                       title="Marcar como leído"
                     >
@@ -279,8 +280,8 @@ export function NotificationsSection() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                     onClick={() => handleDeleteNotification(notification.id)}
-                    className="text-destructive hover:text-destructive"
                     title="Eliminar"
                   >
                     <Trash2 className="h-4 w-4" />

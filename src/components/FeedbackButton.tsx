@@ -90,7 +90,7 @@ export function FeedbackButton() {
         body: JSON.stringify({
           fecha: new Date().toISOString().slice(0, 10),
           usuario: user.nombre || user.correo || "anónimo",
-          organizacion: user.organizacion || "Sin organización",
+          organizacion: user.organizacionActiva?.nombre || "Sin organización",
           email: user.correo || "anónimo",
           descripcion: message.trim(),
           etiquetas: [selectedType]
@@ -117,7 +117,7 @@ export function FeedbackButton() {
       const feedbackData = {
         fecha: new Date().toISOString().slice(0, 10),
         usuario: user.nombre || user.correo || "anónimo",
-        organizacion: user.organizacion || "Sin organización",
+        organizacion: user.organizacionActiva?.nombre || "Sin organización",
         email: user.correo || "anónimo",
         descripcion: message.trim(),
         etiquetas: [selectedType]

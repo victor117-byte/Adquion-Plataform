@@ -315,51 +315,6 @@ export function PowerBISection() {
     return <div className="flex items-center justify-center p-8">Cargando reportes...</div>;
   }
 
-  if (reportes.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Reportes</h1>
-            <p className="text-muted-foreground mt-1">
-              Visualiza reportes embebidos (Power BI, Tableau, etc.)
-            </p>
-          </div>
-          {userRole === 'administrador' && (
-            <Dialog open={dialogOpen} onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) resetForm();
-            }}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar Reporte
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Crear Nuevo Reporte</DialogTitle>
-                </DialogHeader>
-                {renderFormulario()}
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-
-        <Card className="p-12 text-center">
-          <BarChart3 className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No hay reportes configurados</h3>
-          <p className="text-muted-foreground mb-4">
-            {userRole === 'administrador' 
-              ? 'Agrega tu primer reporte embebido de Power BI, Tableau u otra plataforma'
-              : 'Aún no hay reportes disponibles para visualizar'
-            }
-          </p>
-        </Card>
-      </div>
-    );
-  }
-
   const renderFormulario = () => (
     <div className="space-y-4 py-4">
       <div className="space-y-2">
@@ -398,7 +353,7 @@ export function PowerBISection() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="visible_para">Visible Para</Label>
           <Select
@@ -470,7 +425,7 @@ export function PowerBISection() {
         </div>
       )}
       
-      <div className="flex justify-end gap-2 pt-4">
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-4">
         <Button variant="outline" onClick={() => {
           setDialogOpen(false);
           resetForm();
@@ -483,6 +438,52 @@ export function PowerBISection() {
       </div>
     </div>
   );
+
+  if (reportes.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Reportes</h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+              Visualiza reportes embebidos (Power BI, Tableau, etc.)
+            </p>
+          </div>
+          {userRole === 'administrador' && (
+            <Dialog open={dialogOpen} onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) resetForm();
+            }}>
+              <DialogTrigger asChild>
+                <Button className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Reporte
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Crear Nuevo Reporte</DialogTitle>
+                </DialogHeader>
+                {renderFormulario()}
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
+
+        <Card className="p-8 sm:p-12 text-center">
+          <BarChart3 className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No hay reportes configurados</h3>
+          <p className="text-muted-foreground mb-4 text-sm sm:text-base">
+            {userRole === 'administrador' 
+              ? 'Agrega tu primer reporte embebido de Power BI, Tableau u otra plataforma'
+              : 'Aún no hay reportes disponibles para visualizar'
+            }
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
 
   return (
     <div className="grid grid-cols-12 gap-6 h-full">
