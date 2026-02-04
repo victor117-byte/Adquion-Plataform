@@ -1,171 +1,200 @@
-import { useState, useEffect } from 'react';
-import { FileText, Users, Zap, HardDrive, AlertTriangle, Crown } from 'lucide-react';
+import { FileText, Users, Zap, HardDrive, AlertTriangle, Crown, Building2, Calendar } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useSubscription, getUsagePercentage, shouldShowLimitAlert } from '@/hooks/use-subscription';
-import { get } from '@/utils/api';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useUsage, LimitStatus } from '@/hooks/use-usage';
 import { cn } from '@/lib/utils';
 
-interface UsageData {
-  files: number;
-  users: number;
-  automations: number;
-  storage_mb: number;
-}
+// ==================== ICONOS POR RECURSO ====================
 
-interface UsageResponse {
-  success: boolean;
-  data: UsageData;
-}
+const resourceIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  files: FileText,
+  sat_automations: Zap,
+  users: Users,
+  clients: Building2,
+  storage: HardDrive,
+  scheduled_executions: Calendar,
+};
+
+// ==================== COMPONENTE ====================
 
 interface PlanLimitsCardProps {
   onUpgradeClick?: () => void;
+  showAlways?: boolean;
 }
 
-export function PlanLimitsCard({ onUpgradeClick }: PlanLimitsCardProps) {
-  const { subscription, loading: subLoading, isFree } = useSubscription();
-  const [usage, setUsage] = useState<UsageData | null>(null);
-  const [loadingUsage, setLoadingUsage] = useState(true);
+export function PlanLimitsCard({ onUpgradeClick, showAlways = false }: PlanLimitsCardProps) {
+  const { usage, loading, error, hasAnyAtLimit, hasAnyNearLimit } = useUsage();
 
-  useEffect(() => {
-    async function fetchUsage() {
-      try {
-        const response = await get<UsageResponse>('/stripe/usage');
-        if (response.success) {
-          setUsage(response.data);
-        }
-      } catch (error) {
-        console.error('Error fetching usage:', error);
-        // Use default values if endpoint doesn't exist yet
-        setUsage({ files: 0, users: 1, automations: 0, storage_mb: 0 });
-      } finally {
-        setLoadingUsage(false);
-      }
-    }
-    fetchUsage();
-  }, []);
-
-  if (subLoading || loadingUsage || !subscription) {
-    return null; // Don't show skeleton, just hide until loaded
-  }
-
-  const limits = subscription.limits;
-  const showCard = isFree || hasAnyAlert();
-
-  function hasAnyAlert(): boolean {
-    if (!usage || !limits) return false;
+  // Loading state
+  if (loading) {
     return (
-      shouldShowLimitAlert(usage.files, limits.max_files) ||
-      shouldShowLimitAlert(usage.users, limits.max_users) ||
-      shouldShowLimitAlert(usage.automations, limits.max_sat_automations) ||
-      shouldShowLimitAlert(usage.storage_mb, limits.storage_mb)
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-4">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-7 w-24" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="space-y-1">
+              <div className="flex justify-between">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+              <Skeleton className="h-1.5 w-full" />
+            </div>
+          ))}
+        </div>
+      </Card>
     );
   }
 
-  // Only show for free users or when there are alerts
-  if (!showCard) return null;
+  // Error state
+  if (error || !usage) {
+    return null;
+  }
 
-  const limitItems = [
-    {
-      label: 'Archivos',
-      icon: FileText,
-      current: usage?.files || 0,
-      max: limits.max_files,
-    },
-    {
-      label: 'Usuarios',
-      icon: Users,
-      current: usage?.users || 0,
-      max: limits.max_users,
-    },
-    {
-      label: 'Automatizaciones',
-      icon: Zap,
-      current: usage?.automations || 0,
-      max: limits.max_sat_automations,
-    },
-    {
-      label: 'Almacenamiento',
-      icon: HardDrive,
-      current: usage?.storage_mb || 0,
-      max: limits.storage_mb,
-      suffix: 'MB',
-    },
-  ].filter((item) => item.max > 0 && item.max !== -1); // Only show limited items
+  const isFree = usage.planId === 'basic_free' || usage.planName.toLowerCase().includes('free');
+  const hasAlerts = hasAnyAtLimit() || hasAnyNearLimit();
 
-  if (limitItems.length === 0) return null;
+  // Solo mostrar si es gratis, hay alertas, o showAlways está activo
+  if (!showAlways && !isFree && !hasAlerts) {
+    return null;
+  }
+
+  // Filtrar límites que tienen restricción (no ilimitados y mayor a 0)
+  const limitedItems = usage.limits.filter((item) => !item.isUnlimited && item.limit > 0);
+
+  if (limitedItems.length === 0 && !showAlways) {
+    return null;
+  }
 
   return (
     <Card className="p-4 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Crown className="h-4 w-4 text-primary" />
-          <span className="font-medium text-sm">Plan {subscription.plan_name}</span>
+          <span className="font-medium text-sm">Plan {usage.planName}</span>
           {isFree && (
             <Badge variant="secondary" className="text-xs">
               Gratuito
             </Badge>
           )}
         </div>
-        {isFree && onUpgradeClick && (
+        {(isFree || hasAlerts) && onUpgradeClick && (
           <Button variant="outline" size="sm" onClick={onUpgradeClick} className="text-xs h-7">
             Mejorar plan
           </Button>
         )}
       </div>
 
-      <div className="space-y-3">
-        {limitItems.map((item) => {
-          const percentage = getUsagePercentage(item.current, item.max);
-          const showAlert = shouldShowLimitAlert(item.current, item.max);
-          const isAtLimit = percentage >= 100;
-
-          return (
-            <div key={item.label} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">{item.label}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {showAlert && (
-                    <AlertTriangle
-                      className={cn(
-                        'h-3.5 w-3.5',
-                        isAtLimit ? 'text-destructive' : 'text-warning'
-                      )}
-                    />
-                  )}
-                  <span
-                    className={cn(
-                      'font-medium',
-                      isAtLimit && 'text-destructive',
-                      showAlert && !isAtLimit && 'text-warning'
-                    )}
-                  >
-                    {item.current}
-                    {item.suffix && ` ${item.suffix}`}
-                  </span>
-                  <span className="text-muted-foreground">
-                    / {item.max}
-                    {item.suffix && ` ${item.suffix}`}
-                  </span>
-                </div>
-              </div>
-              <Progress
-                value={percentage}
-                className={cn(
-                  'h-1.5',
-                  isAtLimit && '[&>div]:bg-destructive',
-                  showAlert && !isAtLimit && '[&>div]:bg-warning'
-                )}
-              />
+      {/* Warnings */}
+      {usage.hasWarnings && usage.warnings.length > 0 && (
+        <div className="bg-warning/10 border border-warning/30 rounded-md p-2 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
+            <div className="text-xs text-warning-foreground">
+              {usage.warnings.map((warning, i) => (
+                <p key={i}>{warning}</p>
+              ))}
             </div>
-          );
-        })}
+          </div>
+        </div>
+      )}
+
+      {/* Limits */}
+      <div className="space-y-3">
+        {limitedItems.map((item) => (
+          <LimitItem key={item.resource} item={item} />
+        ))}
       </div>
+
+      {/* Quick Stats */}
+      {usage.quickStats && (usage.quickStats.atLimit > 0 || usage.quickStats.nearLimit > 0) && (
+        <div className="mt-4 pt-3 border-t border-border/50">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            {usage.quickStats.atLimit > 0 && (
+              <span className="text-destructive">
+                {usage.quickStats.atLimit} en límite
+              </span>
+            )}
+            {usage.quickStats.nearLimit > 0 && (
+              <span className="text-warning">
+                {usage.quickStats.nearLimit} cerca del límite
+              </span>
+            )}
+            {usage.quickStats.unlimited > 0 && (
+              <span>
+                {usage.quickStats.unlimited} ilimitados
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
+}
+
+// ==================== LIMIT ITEM ====================
+
+interface LimitItemProps {
+  item: LimitStatus;
+}
+
+function LimitItem({ item }: LimitItemProps) {
+  const Icon = resourceIcons[item.resource] || FileText;
+  const showAlert = item.isAtLimit || item.isNearLimit;
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-2">
+          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-muted-foreground">{item.label}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {showAlert && (
+            <AlertTriangle
+              className={cn('h-3.5 w-3.5', item.isAtLimit ? 'text-destructive' : 'text-warning')}
+            />
+          )}
+          <span
+            className={cn(
+              'font-medium',
+              item.isAtLimit && 'text-destructive',
+              item.isNearLimit && !item.isAtLimit && 'text-warning'
+            )}
+          >
+            {formatValue(item.current, item.unit)}
+          </span>
+          <span className="text-muted-foreground">
+            / {formatValue(item.limit, item.unit)}
+          </span>
+        </div>
+      </div>
+      <Progress
+        value={item.percentage}
+        className={cn(
+          'h-1.5',
+          item.isAtLimit && '[&>div]:bg-destructive',
+          item.isNearLimit && !item.isAtLimit && '[&>div]:bg-warning'
+        )}
+      />
+    </div>
+  );
+}
+
+// ==================== HELPERS ====================
+
+function formatValue(value: number, unit: string): string {
+  if (unit === 'MB' || unit === 'mb') {
+    if (value >= 1024) {
+      return `${(value / 1024).toFixed(1)} GB`;
+    }
+    return `${value.toFixed(0)} MB`;
+  }
+  return value.toString();
 }

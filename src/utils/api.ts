@@ -8,6 +8,58 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const IS_DEV = import.meta.env.DEV;
 
+// ==================== TIPOS DE ERROR ====================
+
+export interface LimitExceededError {
+  message: string;
+  upgradeRequired: boolean;
+  current: number;
+  limit: number;
+  resource?: string;
+}
+
+export class ApiLimitExceededError extends Error {
+  upgradeRequired: boolean;
+  current: number;
+  limit: number;
+  resource?: string;
+
+  constructor(data: LimitExceededError) {
+    super(data.message);
+    this.name = 'ApiLimitExceededError';
+    this.upgradeRequired = data.upgradeRequired;
+    this.current = data.current;
+    this.limit = data.limit;
+    this.resource = data.resource;
+  }
+}
+
+// ==================== EVENTOS DE LÍMITE ====================
+
+type LimitExceededCallback = (error: LimitExceededError) => void;
+const limitExceededListeners: LimitExceededCallback[] = [];
+
+/**
+ * Suscribirse a eventos de límite excedido
+ * @returns Función para desuscribirse
+ */
+export function onLimitExceeded(callback: LimitExceededCallback): () => void {
+  limitExceededListeners.push(callback);
+  return () => {
+    const index = limitExceededListeners.indexOf(callback);
+    if (index > -1) {
+      limitExceededListeners.splice(index, 1);
+    }
+  };
+}
+
+/**
+ * Notifica a todos los listeners sobre un límite excedido
+ */
+function notifyLimitExceeded(error: LimitExceededError): void {
+  limitExceededListeners.forEach((callback) => callback(error));
+}
+
 // ==================== HEADERS ====================
 
 /**
@@ -54,13 +106,26 @@ export async function fetchAPI<T = unknown>(
     credentials: 'include', // Importante: envía cookies httpOnly
   });
 
-  // Manejar error 403 - sin acceso a organización
+  const data = await response.json();
+
+  // Manejar error 403 - puede ser límite excedido o sin acceso
   if (response.status === 403) {
-    const data = await response.json();
+    // Verificar si es un error de límite excedido
+    if (data.upgradeRequired) {
+      const limitError: LimitExceededError = {
+        message: data.message || data.error || 'Has alcanzado el límite de tu plan',
+        upgradeRequired: true,
+        current: data.current ?? 0,
+        limit: data.limit ?? 0,
+        resource: data.resource,
+      };
+      // Notificar a los listeners (modal de upgrade)
+      notifyLimitExceeded(limitError);
+      throw new ApiLimitExceededError(limitError);
+    }
+    // Error 403 normal (sin acceso)
     throw new Error(data.message || 'No tienes acceso a este recurso');
   }
-
-  const data = await response.json();
 
   if (!response.ok) {
     throw new Error(data.error || data.message || 'Error en la petición');

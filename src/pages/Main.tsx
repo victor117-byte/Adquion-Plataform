@@ -85,7 +85,7 @@ const navItems: NavItem[] = [
   { id: 'notifications', label: 'Notificaciones', icon: Bell },
   { id: 'powerbi', label: 'Reportes', icon: BarChart3 },
   { id: 'settings', label: 'Configuración', icon: Settings },
-  { id: 'subscription', label: 'Planes', icon: CreditCard, freeOnly: true },
+  { id: 'subscription', label: 'Suscripción', icon: CreditCard },
 ];
 
 export default function Main() {
@@ -351,40 +351,47 @@ export default function Main() {
 
         {/* Navigation */}
         <nav className="p-3 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 240px)' }}>
-          {filteredNavItems.map((item) => (
-            <Button
-              key={item.id}
-              variant={activeSection === item.id ? "default" : "ghost"}
-              className={cn(
-                "w-full justify-start text-base md:text-sm h-12 md:h-10",
-                sidebarCollapsed && "md:justify-center md:px-2",
-                item.freeOnly && "text-primary",
-                activeSection === item.id && item.id === 'subscription' &&
-                  "bg-white border border-primary text-primary shadow-sm hover:bg-primary hover:text-white"
-              )}
-              onClick={() => {
-                setActiveSection(item.id);
-                setMobileMenuOpen(false);
-              }}
-              title={sidebarCollapsed ? item.label : undefined}
-            >
-              <item.icon className={cn(
-                "h-5 w-5 md:h-4 md:w-4",
-                (!sidebarCollapsed || mobileMenuOpen) && "mr-3",
-                activeSection === item.id && item.id === 'subscription' && "text-primary"
-              )} />
-              {(!sidebarCollapsed || mobileMenuOpen) && (
-                <>
-                  <span>{item.label}</span>
-                  {item.freeOnly && (
-                    <Badge variant="secondary" className="ml-auto text-[10px] px-1.5">
-                      Upgrade
-                    </Badge>
-                  )}
-                </>
-              )}
-            </Button>
-          ))}
+          {filteredNavItems.map((item) => {
+            const isSubscriptionForFree = item.id === 'subscription' && isFree;
+            const isActiveSubscription = activeSection === item.id && item.id === 'subscription';
+
+            return (
+              <Button
+                key={item.id}
+                variant={activeSection === item.id ? "default" : "ghost"}
+                className={cn(
+                  "w-full justify-start text-base md:text-sm h-12 md:h-10",
+                  sidebarCollapsed && "md:justify-center md:px-2",
+                  // Estilo llamativo para usuarios Free en el botón de suscripción
+                  isSubscriptionForFree && !isActiveSubscription &&
+                    "bg-gradient-to-r from-primary/10 to-primary/5 text-primary border border-primary/30 hover:from-primary/20 hover:to-primary/10",
+                  isActiveSubscription &&
+                    "bg-primary text-primary-foreground shadow-sm"
+                )}
+                onClick={() => {
+                  setActiveSection(item.id);
+                  setMobileMenuOpen(false);
+                }}
+                title={sidebarCollapsed ? item.label : undefined}
+              >
+                <item.icon className={cn(
+                  "h-5 w-5 md:h-4 md:w-4",
+                  (!sidebarCollapsed || mobileMenuOpen) && "mr-3",
+                  isSubscriptionForFree && "text-primary"
+                )} />
+                {(!sidebarCollapsed || mobileMenuOpen) && (
+                  <>
+                    <span>{isSubscriptionForFree ? 'Planes' : item.label}</span>
+                    {isSubscriptionForFree && (
+                      <Badge className="ml-auto text-[10px] px-1.5 bg-primary text-primary-foreground">
+                        Upgrade
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </Button>
+            );
+          })}
         </nav>
 
         {/* User Info & Logout */}

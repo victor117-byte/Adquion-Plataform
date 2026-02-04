@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
+import { UpgradePlanProvider } from "./contexts/UpgradePlanContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Main from "./pages/Main";
@@ -38,18 +39,20 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <ThemeSync>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-                <Route path="/main" element={<Main />} />
-                {/* Redirección desde Stripe Checkout */}
-                <Route path="/dashboard/billing" element={<BillingRedirect />} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </ThemeSync>
+            <UpgradePlanProvider>
+              <ThemeSync>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/onboarding" element={<Onboarding />} />
+                  <Route path="/main" element={<Main />} />
+                  {/* Redirección desde Stripe Checkout */}
+                  <Route path="/dashboard/billing" element={<BillingRedirect />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </ThemeSync>
+            </UpgradePlanProvider>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>
