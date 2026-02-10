@@ -14,6 +14,7 @@ import {
   Menu,
   ChevronLeft,
   CreditCard,
+  ClipboardList,
   Building2,
   ChevronDown,
   Check
@@ -40,9 +41,10 @@ import { NotificationsSection } from "@/components/main/NotificationsSection";
 import { PowerBISection } from "@/components/main/PowerBISection";
 import { SettingsSection } from "@/components/main/SettingsSection";
 import { SubscriptionSection } from "@/components/main/SubscriptionSection";
+import { Dashboard2Section } from "@/components/main/Dashboard2Section";
 import { FeedbackButton } from "@/components/FeedbackButton";
 
-type SectionType = 'dashboard' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications' | 'powerbi' | 'settings' | 'subscription';
+type SectionType = 'dashboard' | 'dashboard2' | 'users' | 'contributors' | 'documents' | 'automations' | 'notifications' | 'powerbi' | 'settings' | 'subscription';
 
 interface NavItem {
   id: SectionType;
@@ -57,6 +59,7 @@ interface NavItem {
 const menuPermissions: Record<string, SectionType[]> = {
   administrador: [
     'dashboard',
+    'dashboard2',
     'users',
     'contributors',
     'documents',
@@ -68,6 +71,7 @@ const menuPermissions: Record<string, SectionType[]> = {
   ],
   contador: [
     'dashboard',
+    'dashboard2',
     'contributors',
     'documents',
     // 'automations',
@@ -78,6 +82,7 @@ const menuPermissions: Record<string, SectionType[]> = {
 
 const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'dashboard2', label: 'Declaraciones', icon: ClipboardList },
   { id: 'users', label: 'Usuarios', icon: Users },
   { id: 'contributors', label: 'Contribuyentes', icon: UserCheck },
   { id: 'documents', label: 'Documentos', icon: FileText },
@@ -227,6 +232,8 @@ export default function Main() {
     switch (activeSection) {
       case 'dashboard':
         return <DashboardSection />;
+      case 'dashboard2':
+        return <Dashboard2Section />;
       case 'users':
         return isAdmin ? <UsersSection /> : <Navigate to="/main" replace />;
       case 'contributors':
