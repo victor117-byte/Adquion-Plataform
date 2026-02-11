@@ -15,6 +15,7 @@ import {
   Users,
   TrendingUp,
   Loader2,
+  Eye,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,9 +39,17 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useDashboardDeclaraciones,
+  usePdfViewer,
   type Declaracion,
   type FiltrosDeclaraciones,
 } from "@/hooks/use-dashboard-declaraciones";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 const formatCurrency = (amount: number | string | null | undefined) => {
   const num = Number(amount) || 0;
@@ -91,6 +100,22 @@ export function Dashboard2Section() {
     initialize,
   } = useDashboardDeclaraciones(organizacion, filtros, page, limit, sortBy, sortOrder);
 
+  // PDF viewer
+  const { pdfUrl, verPdf, cerrarPdf, loading: pdfLoading, error: pdfError } = usePdfViewer(organizacion);
+  const [selectedDeclaracion, setSelectedDeclaracion] = useState<Declaracion | null>(null);
+
+  const handleRowClick = (d: Declaracion) => {
+    if (d.tiene_pdf && d.num_de_operacion) {
+      setSelectedDeclaracion(d);
+      verPdf(d.num_de_operacion);
+    }
+  };
+
+  const handleClosePdf = () => {
+    setSelectedDeclaracion(null);
+    cerrarPdf();
+  };
+
   const hasFilters = filterRfc || filterRazonSocial || filterEstado !== "all" || filterBusqueda;
 
   const clearFilters = () => {
@@ -116,8 +141,8 @@ export function Dashboard2Section() {
     setPage(1);
   };
 
-  // Estado: No inicializado
-  if (initialized === false) {
+  // Estado: Inicializando automáticamente
+  if (initialized === false || initializing) {
     return (
       <div className="space-y-4 sm:space-y-6">
         <div>
@@ -127,28 +152,8 @@ export function Dashboard2Section() {
           </p>
         </div>
         <Card className="p-8 flex flex-col items-center justify-center min-h-[300px] text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-          <h2 className="text-lg font-semibold text-foreground mb-2">Dashboard no inicializado</h2>
-          <p className="text-sm text-muted-foreground max-w-md mb-6">
-            Es necesario inicializar el dashboard de declaraciones para esta organización.
-            Esto creará las vistas necesarias en la base de datos.
-          </p>
-          {user?.tipo_usuario === "administrador" ? (
-            <Button onClick={initialize} disabled={initializing}>
-              {initializing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Inicializando...
-                </>
-              ) : (
-                "Inicializar Dashboard"
-              )}
-            </Button>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Contacta a un administrador para inicializar este módulo.
-            </p>
-          )}
+          <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+          <p className="text-sm text-muted-foreground">Preparando dashboard...</p>
         </Card>
       </div>
     );
@@ -187,7 +192,11 @@ export function Dashboard2Section() {
     const status = statusConfig[d.estatus_pago] || statusConfig.Pendiente;
 
     return (
-      <TableRow key={`${d.rfc}-${d.linea_de_captura}-${index}`}>
+      <TableRow
+        key={`${d.rfc}-${d.linea_de_captura}-${index}`}
+        className={d.tiene_pdf ? "cursor-pointer hover:bg-muted/50" : ""}
+        onClick={() => handleRowClick(d)}
+      >
         <TableCell className="font-medium max-w-[200px] truncate" title={d.razon_social}>
           {d.razon_social}
         </TableCell>
@@ -213,6 +222,13 @@ export function Dashboard2Section() {
             {d.estatus_pago}
           </Badge>
         </TableCell>
+        <TableCell className="text-center">
+          {d.tiene_pdf ? (
+            <Eye className="h-4 w-4 text-muted-foreground mx-auto" />
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </TableCell>
       </TableRow>
     );
   };
@@ -223,15 +239,22 @@ export function Dashboard2Section() {
     const status = statusConfig[d.estatus_pago] || statusConfig.Pendiente;
 
     return (
-      <Card key={`${d.rfc}-${d.linea_de_captura}-${index}`} className="p-4 space-y-3">
+      <Card
+        key={`${d.rfc}-${d.linea_de_captura}-${index}`}
+        className={`p-4 space-y-3 ${d.tiene_pdf ? "cursor-pointer hover:bg-muted/50" : ""}`}
+        onClick={() => handleRowClick(d)}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="font-medium text-sm truncate">{d.razon_social}</p>
             <p className="text-xs text-muted-foreground font-mono">{d.rfc}</p>
           </div>
-          <Badge variant="secondary" className={`${status.className} shrink-0`}>
-            {d.estatus_pago}
-          </Badge>
+          <div className="flex items-center gap-2 shrink-0">
+            {d.tiene_pdf && <Eye className="h-4 w-4 text-muted-foreground" />}
+            <Badge variant="secondary" className={status.className}>
+              {d.estatus_pago}
+            </Badge>
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
@@ -405,12 +428,13 @@ export function Dashboard2Section() {
                     <SortableHeader field="estatus_pago">
                       <span className="mx-auto">Estado</span>
                     </SortableHeader>
+                    <TableHead className="text-center w-[60px]">PDF</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No se encontraron declaraciones
                       </TableCell>
                     </TableRow>
@@ -482,6 +506,40 @@ export function Dashboard2Section() {
           </div>
         </div>
       )}
+
+      {/* PDF Viewer Dialog */}
+      <Dialog open={selectedDeclaracion !== null} onOpenChange={(open) => { if (!open) handleClosePdf(); }}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-2">
+            <DialogTitle className="text-base">
+              {selectedDeclaracion?.razon_social} — {selectedDeclaracion?.rfc}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {selectedDeclaracion?.concepto_de_pago} · {selectedDeclaracion?.periodo_de_declaracion} {selectedDeclaracion?.ejercicio}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 px-6 pb-6 min-h-0">
+            {pdfLoading && (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            )}
+            {pdfError && (
+              <div className="flex flex-col items-center justify-center h-full gap-2">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
+                <p className="text-sm text-destructive">{pdfError}</p>
+              </div>
+            )}
+            {pdfUrl && !pdfLoading && (
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full rounded-md border"
+                title="PDF Declaración"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

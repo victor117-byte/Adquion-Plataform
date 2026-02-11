@@ -1,8 +1,8 @@
 # API Dashboard Declaraciones v2
 
 > **Base URL**: `/api/dashboard-declaraciones`
-> **Version**: 2.0.0
-> **Fecha**: 2026-02-10
+> **Version**: 2.1.0
+> **Fecha**: 2026-02-11
 
 ---
 
@@ -36,6 +36,24 @@ Body: { "correo": "usuario@email.com", "contraseña": "...", "organizacion": "mi
 
 ---
 
+## Seguridad por Rol
+
+Todos los endpoints del dashboard filtran datos segun el tipo de usuario:
+
+| Tipo Usuario | Acceso |
+|---|---|
+| `administrador` | Ve **todas** las declaraciones, KPIs y PDFs de la organizacion |
+| `contador` | Solo ve declaraciones, KPIs y PDFs de los **contribuyentes que tiene asignados** |
+
+El filtrado se aplica automaticamente por RFC. Un contador con 3 contribuyentes asignados solo vera las declaraciones de esos 3 RFCs. Si no tiene contribuyentes asignados, no vera nada.
+
+Este filtrado aplica a:
+- `GET /api/dashboard-declaraciones` (listado y KPIs embebidos)
+- `GET /api/dashboard-declaraciones/kpis` (KPIs independientes)
+- `GET /api/dashboard-declaraciones/pdf` (visualizacion de PDF)
+
+---
+
 ## Tablas Fuente
 
 ### py_declaracion
@@ -59,6 +77,8 @@ Body: { "correo": "usuario@email.com", "contraseña": "...", "organizacion": "mi
 | `numero_de_concepto` | TEXT | Numero de concepto |
 | `path` | TEXT | Ruta del archivo PDF |
 | `fecha_captura` | TIMESTAMP | Fecha de insercion en BD |
+| `pdf_base64` | TEXT | Contenido del PDF en base64 (para visualizacion) |
+| `ruta_archivo` | TEXT | Ruta origen del archivo (interno, no se expone al frontend) |
 
 ### py_pago
 
@@ -80,6 +100,8 @@ Body: { "correo": "usuario@email.com", "contraseña": "...", "organizacion": "mi
 | `numero_de_concepto` | TEXT | Numero de concepto |
 | `path` | TEXT | Ruta del archivo PDF |
 | `fecha_captura` | TIMESTAMP | Fecha de insercion en BD |
+| `pdf_base64` | TEXT | Contenido del PDF en base64 (para visualizacion) |
+| `ruta_archivo` | TEXT | Ruta origen del archivo (interno, no se expone al frontend) |
 
 ### Vista: py_dashboard_declaraciones
 
@@ -93,9 +115,11 @@ Body: { "correo": "usuario@email.com", "contraseña": "...", "organizacion": "mi
 | `concepto_de_pago` | TEXT | Concepto de pago |
 | `ejercicio` | TEXT | Ano fiscal |
 | `periodo_de_declaracion` | TEXT | Periodo |
+| `num_de_operacion` | TEXT | Numero de operacion SAT (identificador para obtener PDF) |
 | `total_a_pagar_unico` | DECIMAL(18,2) | Monto deduplicado (solo cuenta 1 vez por linea de captura) |
 | `estatus_pago` | TEXT | `Pagado`, `Pendiente` o `Vencido` |
 | `fecha_de_pago` | TEXT | Fecha de pago (si existe) |
+| `pdf_base64` | TEXT | PDF en base64 (no se envia en listado, solo via endpoint /pdf) |
 
 **Logica de Estatus:**
 - **Pagado**: Existe registro en `py_pago` con `fecha_de_pago` no vacia
@@ -149,7 +173,9 @@ GET /api/dashboard-declaraciones?organizacion={org}
       "estatus_pago": "Pendiente",
       "fecha_de_pago": null,
       "ejercicio": "2026",
-      "periodo_de_declaracion": "Enero"
+      "periodo_de_declaracion": "Enero",
+      "num_de_operacion": "OP2026010112345",
+      "tiene_pdf": true
     }
   ],
   "pagination": {
@@ -178,9 +204,48 @@ GET /api/dashboard-declaraciones?organizacion={org}
 }
 ```
 
+> **Nota**: El campo `tiene_pdf` indica si hay un PDF disponible para esa declaracion. El contenido del PDF NO se incluye en el listado para mantener la respuesta ligera. Para obtener el PDF, usar el endpoint `/pdf`.
+
 ---
 
-### 2. KPIs (Polling)
+### 2. Obtener PDF de Declaracion/Pago
+
+```http
+GET /api/dashboard-declaraciones/pdf?organizacion={org}&num_de_operacion={num}&tabla={tabla}
+```
+
+#### Parametros de Query
+
+| Parametro | Tipo | Requerido | Descripcion |
+|-----------|------|-----------|-------------|
+| `organizacion` | string | Si | Nombre de la organizacion |
+| `num_de_operacion` | string | Si | Numero de operacion de la declaracion o pago |
+| `tabla` | string | No | `py_declaracion` (default) o `py_pago` |
+
+#### Respuesta Exitosa (200)
+
+```json
+{
+  "success": true,
+  "pdf_base64": "JVBERi0xLjQKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZw...",
+  "rfc": "XAXX010101000"
+}
+```
+
+#### Respuesta No Encontrado (404)
+
+```json
+{
+  "error": "PDF no encontrado",
+  "code": "NOT_FOUND"
+}
+```
+
+> **Seguridad**: Un contador solo puede obtener PDFs de contribuyentes que tiene asignados. Si intenta acceder a un PDF de otro contribuyente, recibira 404.
+
+---
+
+### 3. KPIs (Polling)
 
 ```http
 GET /api/dashboard-declaraciones/kpis?organizacion={org}
@@ -211,15 +276,17 @@ GET /api/dashboard-declaraciones/kpis?organizacion={org}
     "contribuyentes_activos": 45
   },
   "filtros": { "rfc": null, "ejercicio": null },
-  "timestamp": "2026-02-10T15:35:00Z"
+  "timestamp": "2026-02-11T15:35:00Z"
 }
 ```
 
 **Cache**: `Cache-Control: private, max-age=30`
 
+> **Nota**: Los KPIs de un contador solo reflejan los contribuyentes que tiene asignados.
+
 ---
 
-### 3. Verificar Inicializacion
+### 4. Verificar Inicializacion
 
 ```http
 GET /api/dashboard-declaraciones/initialize?organizacion={org}
@@ -242,7 +309,7 @@ GET /api/dashboard-declaraciones/initialize?organizacion={org}
 
 ---
 
-### 4. Inicializar Dashboard
+### 5. Inicializar Dashboard
 
 ```http
 POST /api/dashboard-declaraciones/initialize
@@ -273,7 +340,7 @@ POST /api/dashboard-declaraciones/initialize
 }
 ```
 
-> Crea las tablas `py_declaracion` y `py_pago` (si no existen) y la vista `py_dashboard_declaraciones`. No requiere sincronizacion — la vista es en tiempo real.
+> Crea las tablas `py_declaracion` y `py_pago` (si no existen), agrega columnas `pdf_base64` y `ruta_archivo` a tablas existentes, y crea/actualiza la vista `py_dashboard_declaraciones`. No requiere sincronizacion — la vista es en tiempo real.
 
 ---
 
@@ -282,10 +349,13 @@ POST /api/dashboard-declaraciones/initialize
 | Codigo HTTP | Codigo | Descripcion |
 |-------------|--------|-------------|
 | 400 | `MISSING_ORG` | Falta el parametro organizacion |
+| 400 | `MISSING_PARAM` | Falta un parametro requerido (ej: num_de_operacion) |
+| 400 | `INVALID_PARAM` | Parametro con valor invalido |
 | 400 | `INVALID_JSON` | Body JSON invalido |
 | 401 | `AUTH_FAILED` | Token JWT invalido o expirado |
 | 403 | - | Sin permisos (no es administrador) |
 | 404 | `NOT_INITIALIZED` | Vista no creada para esta org |
+| 404 | `NOT_FOUND` | Recurso no encontrado (ej: PDF) |
 | 429 | `RATE_LIMITED` | Demasiadas solicitudes (60/min) |
 | 500 | `INTERNAL_ERROR` | Error interno del servidor |
 | 500 | `INIT_FAILED` | Error al crear la vista |
@@ -299,12 +369,28 @@ POST /api/dashboard-declaraciones/initialize
 ```typescript
 import { useState, useEffect, useCallback } from 'react';
 
+interface DeclaracionRow {
+  razon_social: string | null;
+  rfc: string | null;
+  fecha_y_hora_presentacion: string | null;
+  linea_de_captura: string | null;
+  impuesto_a_favor: string | null;
+  total_a_pagar_unico: number;
+  concepto_de_pago: string | null;
+  estatus_pago: 'Pagado' | 'Pendiente' | 'Vencido';
+  fecha_de_pago: string | null;
+  ejercicio: string | null;
+  periodo_de_declaracion: string | null;
+  num_de_operacion: string | null;
+  tiene_pdf: boolean;
+}
+
 interface FiltrosDeclaraciones {
   rfc?: string;
   razon_social?: string;
   ejercicio?: string;
   periodo?: string;
-  estatus_pago?: string; // 'Pagado' | 'Pendiente' | 'Vencido'
+  estatus_pago?: string;
   busqueda?: string;
 }
 
@@ -314,7 +400,7 @@ export function useDashboardDeclaraciones(
   page = 1,
   limit = 20
 ) {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<DeclaracionRow[]>([]);
   const [kpis, setKpis] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -330,7 +416,6 @@ export function useDashboardDeclaraciones(
         limit: String(limit),
       });
 
-      // Agregar filtros no vacios
       if (filtros.rfc) params.set('rfc', filtros.rfc);
       if (filtros.razon_social) params.set('razon_social', filtros.razon_social);
       if (filtros.ejercicio) params.set('ejercicio', filtros.ejercicio);
@@ -363,6 +448,113 @@ export function useDashboardDeclaraciones(
   }, [fetchData]);
 
   return { data, kpis, pagination, loading, error, refetch: fetchData };
+}
+```
+
+### Hook para obtener y visualizar PDF
+
+```typescript
+export function usePdfViewer(organizacion: string) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const verPdf = useCallback(async (
+    numDeOperacion: string,
+    tabla: 'py_declaracion' | 'py_pago' = 'py_declaracion'
+  ) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        organizacion,
+        num_de_operacion: numDeOperacion,
+        tabla,
+      });
+
+      const res = await fetch(`/api/dashboard-declaraciones/pdf?${params}`, {
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Error al obtener PDF');
+      }
+
+      const result = await res.json();
+
+      // Convertir base64 a Blob y abrir en nueva ventana
+      const byteCharacters = atob(result.pdf_base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+      return result.pdf_base64;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      setError(msg);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [organizacion]);
+
+  return { verPdf, loading, error };
+}
+```
+
+### Ejemplo de uso en componente (tabla con boton PDF)
+
+```tsx
+function TablaDeclaraciones({ organizacion }: { organizacion: string }) {
+  const { data, kpis, pagination, loading } = useDashboardDeclaraciones(organizacion);
+  const { verPdf, loading: pdfLoading } = usePdfViewer(organizacion);
+
+  if (loading) return <p>Cargando...</p>;
+
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>RFC</th>
+          <th>Razon Social</th>
+          <th>Ejercicio</th>
+          <th>Periodo</th>
+          <th>Total a Pagar</th>
+          <th>Estatus</th>
+          <th>PDF</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((row, i) => (
+          <tr key={i}>
+            <td>{row.rfc}</td>
+            <td>{row.razon_social}</td>
+            <td>{row.ejercicio}</td>
+            <td>{row.periodo_de_declaracion}</td>
+            <td>${row.total_a_pagar_unico?.toFixed(2)}</td>
+            <td>{row.estatus_pago}</td>
+            <td>
+              {row.tiene_pdf && row.num_de_operacion ? (
+                <button
+                  onClick={() => verPdf(row.num_de_operacion!)}
+                  disabled={pdfLoading}
+                >
+                  Ver PDF
+                </button>
+              ) : (
+                <span>-</span>
+              )}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
 }
 ```
 
@@ -414,3 +606,18 @@ async function inicializarDashboard(organizacion: string) {
 - **Limite**: 60 requests/min por usuario+organizacion
 - **Polling recomendado**: Cada 30 segundos para KPIs
 - **Debounce en filtros**: 300ms antes de enviar request
+
+---
+
+## Limpieza de Duplicados
+
+Los scripts de automatizacion Python ejecutan limpieza automatica de duplicados al finalizar cada sincronizacion. Las tablas y sus criterios de deduplicacion son:
+
+| Tabla | Deduplicar por | Conserva |
+|---|---|---|
+| `py_declaracion` | `rfc` + `num_de_operacion` + `numero_de_concepto` | Registro mas reciente |
+| `py_pago` | `rfc` + `linea_de_captura` + `numero_de_concepto` | Registro mas reciente |
+| `py_constancia_de_situacion_fiscal` | `rfc` | Registro mas reciente |
+| `py_diot` | `folio` | Registro mas reciente |
+| `py_opinion_de_cumplimiento` | `rfc` + `folio` | Registro mas reciente |
+| `py_informacion_contribuyente` | `rfc` | Registro mas reciente |

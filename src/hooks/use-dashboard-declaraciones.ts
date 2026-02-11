@@ -15,6 +15,8 @@ export interface Declaracion {
   fecha_de_pago: string | null;
   ejercicio: string;
   periodo_de_declaracion: string;
+  num_de_operacion: string | null;
+  tiene_pdf: boolean;
 }
 
 export interface KPIs {
@@ -54,14 +56,58 @@ interface DashboardResponse {
   kpis: KPIs;
 }
 
-interface InitializeCheckResponse {
-  success: boolean;
-  initialized: boolean;
-}
-
 interface InitializeResponse {
   success: boolean;
   message: string;
+}
+
+// ==================== HOOK PDF ====================
+
+export function usePdfViewer(organizacion: string | undefined) {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const verPdf = useCallback(
+    async (numDeOperacion: string, tabla: "py_declaracion" | "py_pago" = "py_declaracion") => {
+      if (!organizacion) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({
+          organizacion,
+          num_de_operacion: numDeOperacion,
+          tabla,
+        });
+        const res = await fetchAPI<{ success: boolean; pdf_base64: string }>(
+          `/dashboard-declaraciones/pdf?${params.toString()}`
+        );
+        const byteCharacters = atob(res.pdf_base64);
+        const byteNumbers = new Uint8Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const blob = new Blob([byteNumbers], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Error al obtener PDF");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [organizacion]
+  );
+
+  const cerrarPdf = useCallback(() => {
+    if (pdfUrl) {
+      URL.revokeObjectURL(pdfUrl);
+      setPdfUrl(null);
+    }
+    setError(null);
+  }, [pdfUrl]);
+
+  return { pdfUrl, verPdf, cerrarPdf, loading, error };
 }
 
 // ==================== HOOK PRINCIPAL ====================
@@ -88,20 +134,6 @@ export function useDashboardDeclaraciones(
   // Debounce timer ref
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // Verificar inicialización
-  const checkInitialized = useCallback(async () => {
-    if (!organizacion) return;
-    try {
-      const res = await fetchAPI<InitializeCheckResponse>(
-        `/dashboard-declaraciones/initialize?organizacion=${encodeURIComponent(organizacion)}`,
-        { method: "GET" }
-      );
-      setInitialized(res.initialized);
-    } catch {
-      setInitialized(false);
-    }
-  }, [organizacion]);
-
   // Inicializar dashboard
   const initialize = useCallback(async () => {
     if (!organizacion) return;
@@ -121,6 +153,13 @@ export function useDashboardDeclaraciones(
       setInitializing(false);
     }
   }, [organizacion]);
+
+  // Siempre POST initialize al montar — CREATE OR REPLACE VIEW es idempotente
+  // y asegura que la vista tenga los campos más recientes
+  const autoInit = useCallback(async () => {
+    if (!organizacion) return;
+    await initialize();
+  }, [organizacion, initialize]);
 
   // Fetch datos
   const fetchData = useCallback(async () => {
@@ -157,10 +196,10 @@ export function useDashboardDeclaraciones(
     }
   }, [organizacion, initialized, filtrosKey, page, limit, sortBy, sortOrder]);
 
-  // Check initialization on mount
+  // Check initialization on mount — auto-init if needed
   useEffect(() => {
-    checkInitialized();
-  }, [checkInitialized]);
+    autoInit();
+  }, [autoInit]);
 
   // Fetch data with debounce for filter changes
   useEffect(() => {
