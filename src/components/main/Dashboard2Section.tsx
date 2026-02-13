@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Loader2,
   Eye,
+  Download,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const formatCurrency = (amount: number | string | null | undefined) => {
   const num = Number(amount) || 0;
@@ -101,19 +103,27 @@ export function Dashboard2Section() {
   } = useDashboardDeclaraciones(organizacion, filtros, page, limit, sortBy, sortOrder);
 
   // PDF viewer
-  const { pdfUrl, verPdf, cerrarPdf, loading: pdfLoading, error: pdfError } = usePdfViewer(organizacion);
+  const declaracionPdf = usePdfViewer();
+  const pagoPdf = usePdfViewer();
   const [selectedDeclaracion, setSelectedDeclaracion] = useState<Declaracion | null>(null);
 
-  const handleRowClick = (d: Declaracion) => {
-    if (d.tiene_pdf && d.num_de_operacion) {
-      setSelectedDeclaracion(d);
-      verPdf(d.num_de_operacion);
-    }
+  const handleOpenPdfs = (d: Declaracion) => {
+    setSelectedDeclaracion(d);
+    if (d.pdf_base64) declaracionPdf.verPdf(d.pdf_base64);
+    if (d.pdf_pago) pagoPdf.verPdf(d.pdf_pago);
   };
 
   const handleClosePdf = () => {
     setSelectedDeclaracion(null);
-    cerrarPdf();
+    declaracionPdf.cerrarPdf();
+    pagoPdf.cerrarPdf();
+  };
+
+  const downloadPdf = (base64: string, filename: string) => {
+    const link = document.createElement("a");
+    link.href = `data:application/pdf;base64,${base64}`;
+    link.download = filename;
+    link.click();
   };
 
   const hasFilters = filterRfc || filterRazonSocial || filterEstado !== "all" || filterBusqueda;
@@ -192,17 +202,14 @@ export function Dashboard2Section() {
     const status = statusConfig[d.estatus_pago] || statusConfig.Pendiente;
 
     return (
-      <TableRow
-        key={`${d.rfc}-${d.linea_de_captura}-${index}`}
-        className={d.tiene_pdf ? "cursor-pointer hover:bg-muted/50" : ""}
-        onClick={() => handleRowClick(d)}
-      >
-        <TableCell className="font-medium max-w-[200px] truncate" title={d.razon_social}>
+      <TableRow key={`${d.rfc}-${d.linea_de_captura}-${index}`}>
+        <TableCell className="font-medium max-w-[200px] truncate" title={d.razon_social || ""}>
           {d.razon_social}
         </TableCell>
         <TableCell className="font-mono text-sm">{d.rfc}</TableCell>
         <TableCell className="text-sm">{d.fecha_y_hora_presentacion}</TableCell>
         <TableCell className="font-mono text-sm">{d.linea_de_captura}</TableCell>
+        <TableCell className="text-sm">{d.fecha_hasta || "—"}</TableCell>
         <TableCell className="text-right">
           {impFavor > 0 ? (
             <span className="text-success font-medium">{formatCurrency(impFavor)}</span>
@@ -222,12 +229,16 @@ export function Dashboard2Section() {
             {d.estatus_pago}
           </Badge>
         </TableCell>
-        <TableCell className="text-center">
-          {d.tiene_pdf ? (
-            <Eye className="h-4 w-4 text-muted-foreground mx-auto" />
-          ) : (
-            <span className="text-muted-foreground">—</span>
-          )}
+        <TableCell>
+          <div className="flex items-center gap-1 justify-center">
+            {(d.pdf_base64 || d.pdf_pago) ? (
+              <Button variant="ghost" size="icon" className="h-7 w-7" title="Ver documentos" onClick={() => handleOpenPdfs(d)}>
+                <Eye className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
+          </div>
         </TableCell>
       </TableRow>
     );
@@ -241,20 +252,16 @@ export function Dashboard2Section() {
     return (
       <Card
         key={`${d.rfc}-${d.linea_de_captura}-${index}`}
-        className={`p-4 space-y-3 ${d.tiene_pdf ? "cursor-pointer hover:bg-muted/50" : ""}`}
-        onClick={() => handleRowClick(d)}
+        className="p-4 space-y-3"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="font-medium text-sm truncate">{d.razon_social}</p>
             <p className="text-xs text-muted-foreground font-mono">{d.rfc}</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {d.tiene_pdf && <Eye className="h-4 w-4 text-muted-foreground" />}
-            <Badge variant="secondary" className={status.className}>
-              {d.estatus_pago}
-            </Badge>
-          </div>
+          <Badge variant="secondary" className={status.className}>
+            {d.estatus_pago}
+          </Badge>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
@@ -262,8 +269,8 @@ export function Dashboard2Section() {
             <p className="text-sm">{d.fecha_y_hora_presentacion}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Línea de Captura</p>
-            <p className="font-mono text-xs">{d.linea_de_captura}</p>
+            <p className="text-xs text-muted-foreground">Vigencia</p>
+            <p className="text-sm">{d.fecha_hasta || "—"}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Impuesto a Favor</p>
@@ -278,6 +285,13 @@ export function Dashboard2Section() {
             </p>
           </div>
         </div>
+        {(d.pdf_base64 || d.pdf_pago) && (
+          <div className="flex items-center gap-2 pt-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => handleOpenPdfs(d)}>
+              <Eye className="h-3 w-3" /> Ver documentos
+            </Button>
+          </div>
+        )}
       </Card>
     );
   };
@@ -421,6 +435,7 @@ export function Dashboard2Section() {
                     <SortableHeader field="rfc">RFC</SortableHeader>
                     <SortableHeader field="fecha_y_hora_presentacion">Fecha de Presentación</SortableHeader>
                     <SortableHeader field="linea_de_captura">Línea de Captura</SortableHeader>
+                    <SortableHeader field="fecha_hasta">Vigencia</SortableHeader>
                     <TableHead className="text-right">Impuesto a Favor</TableHead>
                     <SortableHeader field="total_a_pagar_unico">
                       <span className="ml-auto">Total a Pagar</span>
@@ -428,13 +443,13 @@ export function Dashboard2Section() {
                     <SortableHeader field="estatus_pago">
                       <span className="mx-auto">Estado</span>
                     </SortableHeader>
-                    <TableHead className="text-center w-[60px]">PDF</TableHead>
+                    <TableHead className="text-center">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No se encontraron declaraciones
                       </TableCell>
                     </TableRow>
@@ -509,35 +524,111 @@ export function Dashboard2Section() {
 
       {/* PDF Viewer Dialog */}
       <Dialog open={selectedDeclaracion !== null} onOpenChange={(open) => { if (!open) handleClosePdf(); }}>
-        <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0">
-          <DialogHeader className="px-6 pt-6 pb-2">
-            <DialogTitle className="text-base">
-              {selectedDeclaracion?.razon_social} — {selectedDeclaracion?.rfc}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              {selectedDeclaracion?.concepto_de_pago} · {selectedDeclaracion?.periodo_de_declaracion} {selectedDeclaracion?.ejercicio}
-            </DialogDescription>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <DialogTitle className="text-base font-semibold">
+                  {selectedDeclaracion?.razon_social}
+                </DialogTitle>
+                <DialogDescription className="text-xs mt-1 flex items-center gap-2 flex-wrap">
+                  <span className="font-mono">{selectedDeclaracion?.rfc}</span>
+                  <span className="text-muted-foreground/40">|</span>
+                  <span>Periodo {selectedDeclaracion?.periodo_de_declaracion}/{selectedDeclaracion?.ejercicio}</span>
+                  {selectedDeclaracion?.estatus_pago && (
+                    <>
+                      <span className="text-muted-foreground/40">|</span>
+                      <Badge variant="secondary" className={statusConfig[selectedDeclaracion.estatus_pago]?.className + " text-[10px] px-1.5 py-0"}>
+                        {selectedDeclaracion.estatus_pago}
+                      </Badge>
+                    </>
+                  )}
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="flex-1 px-6 pb-6 min-h-0">
-            {pdfLoading && (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+
+          {selectedDeclaracion?.pdf_base64 && selectedDeclaracion?.pdf_pago ? (
+            <Tabs defaultValue="declaracion" className="flex-1 flex flex-col min-h-0">
+              <div className="px-6 pt-3 flex items-center justify-between gap-2">
+                <TabsList>
+                  <TabsTrigger value="declaracion" className="gap-1.5">
+                    <FileText className="h-3.5 w-3.5" />
+                    Declaración
+                  </TabsTrigger>
+                  <TabsTrigger value="pago" className="gap-1.5">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Comprobante de Pago
+                  </TabsTrigger>
+                </TabsList>
+                <div className="flex items-center gap-1">
+                  {selectedDeclaracion.pdf_base64 && (
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => downloadPdf(selectedDeclaracion.pdf_base64!, `declaracion_${selectedDeclaracion.rfc}.pdf`)}>
+                      <Download className="h-3.5 w-3.5" />
+                      Declaración
+                    </Button>
+                  )}
+                  {selectedDeclaracion.pdf_pago && (
+                    <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => downloadPdf(selectedDeclaracion.pdf_pago!, `pago_${selectedDeclaracion.rfc}.pdf`)}>
+                      <Download className="h-3.5 w-3.5" />
+                      Pago
+                    </Button>
+                  )}
+                </div>
               </div>
-            )}
-            {pdfError && (
-              <div className="flex flex-col items-center justify-center h-full gap-2">
-                <AlertTriangle className="h-8 w-8 text-destructive" />
-                <p className="text-sm text-destructive">{pdfError}</p>
+              <TabsContent value="declaracion" className="flex-1 px-6 pb-6 mt-3 min-h-0">
+                {declaracionPdf.error ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-2">
+                    <AlertTriangle className="h-8 w-8 text-destructive" />
+                    <p className="text-sm text-destructive">{declaracionPdf.error}</p>
+                  </div>
+                ) : declaracionPdf.pdfUrl ? (
+                  <iframe src={declaracionPdf.pdfUrl} className="w-full h-full rounded-md border" title="PDF Declaración" />
+                ) : null}
+              </TabsContent>
+              <TabsContent value="pago" className="flex-1 px-6 pb-6 mt-3 min-h-0">
+                {pagoPdf.error ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-2">
+                    <AlertTriangle className="h-8 w-8 text-destructive" />
+                    <p className="text-sm text-destructive">{pagoPdf.error}</p>
+                  </div>
+                ) : pagoPdf.pdfUrl ? (
+                  <iframe src={pagoPdf.pdfUrl} className="w-full h-full rounded-md border" title="PDF Comprobante de Pago" />
+                ) : null}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="px-6 pt-3 flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {selectedDeclaracion?.pdf_base64 ? "Declaración" : "Comprobante de Pago"}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs gap-1.5"
+                  onClick={() => {
+                    const base64 = selectedDeclaracion?.pdf_base64 || selectedDeclaracion?.pdf_pago;
+                    const type = selectedDeclaracion?.pdf_base64 ? "declaracion" : "pago";
+                    if (base64) downloadPdf(base64, `${type}_${selectedDeclaracion?.rfc}.pdf`);
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Descargar
+                </Button>
               </div>
-            )}
-            {pdfUrl && !pdfLoading && (
-              <iframe
-                src={pdfUrl}
-                className="w-full h-full rounded-md border"
-                title="PDF Declaración"
-              />
-            )}
-          </div>
+              <div className="flex-1 px-6 pb-6 mt-3 min-h-0">
+                {(declaracionPdf.error || pagoPdf.error) ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-2">
+                    <AlertTriangle className="h-8 w-8 text-destructive" />
+                    <p className="text-sm text-destructive">{declaracionPdf.error || pagoPdf.error}</p>
+                  </div>
+                ) : (declaracionPdf.pdfUrl || pagoPdf.pdfUrl) ? (
+                  <iframe src={(declaracionPdf.pdfUrl || pagoPdf.pdfUrl)!} className="w-full h-full rounded-md border" title="PDF" />
+                ) : null}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

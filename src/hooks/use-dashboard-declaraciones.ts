@@ -4,19 +4,22 @@ import { fetchAPI } from "@/utils/api";
 // ==================== TIPOS ====================
 
 export interface Declaracion {
-  razon_social: string;
-  rfc: string;
-  fecha_y_hora_presentacion: string;
-  linea_de_captura: string;
+  razon_social: string | null;
+  rfc: string | null;
+  fecha_y_hora_presentacion: string | null;
+  linea_de_captura: string | null;
   impuesto_a_favor: string | null;
   total_a_pagar_unico: number;
-  concepto_de_pago: string;
   estatus_pago: "Pagado" | "Pendiente" | "Vencido";
   fecha_de_pago: string | null;
-  ejercicio: string;
-  periodo_de_declaracion: string;
+  fecha_hasta: string | null;
+  ejercicio: string | null;
+  periodo_de_declaracion: string | null;
   num_de_operacion: string | null;
   tiene_pdf: boolean;
+  pdf_base64: string | null;
+  pdf_pago: string | null;
+  ruta_pago: string | null;
 }
 
 export interface KPIs {
@@ -63,41 +66,29 @@ interface InitializeResponse {
 
 // ==================== HOOK PDF ====================
 
-export function usePdfViewer(organizacion: string | undefined) {
+export function usePdfViewer() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const verPdf = useCallback(
-    async (numDeOperacion: string, tabla: "py_declaracion" | "py_pago" = "py_declaracion") => {
-      if (!organizacion) return;
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({
-          organizacion,
-          num_de_operacion: numDeOperacion,
-          tabla,
-        });
-        const res = await fetchAPI<{ success: boolean; pdf_base64: string }>(
-          `/dashboard-declaraciones/pdf?${params.toString()}`
-        );
-        const byteCharacters = atob(res.pdf_base64);
-        const byteNumbers = new Uint8Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const blob = new Blob([byteNumbers], { type: "application/pdf" });
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Error al obtener PDF");
-      } finally {
-        setLoading(false);
+  const verPdf = useCallback((base64: string | null) => {
+    if (!base64) {
+      setError("No hay PDF disponible");
+      return;
+    }
+    setError(null);
+    try {
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Uint8Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
-    },
-    [organizacion]
-  );
+      const blob = new Blob([byteNumbers], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      setPdfUrl(url);
+    } catch {
+      setError("Error al procesar el PDF");
+    }
+  }, []);
 
   const cerrarPdf = useCallback(() => {
     if (pdfUrl) {
@@ -107,7 +98,7 @@ export function usePdfViewer(organizacion: string | undefined) {
     setError(null);
   }, [pdfUrl]);
 
-  return { pdfUrl, verPdf, cerrarPdf, loading, error };
+  return { pdfUrl, verPdf, cerrarPdf, error };
 }
 
 // ==================== HOOK PRINCIPAL ====================

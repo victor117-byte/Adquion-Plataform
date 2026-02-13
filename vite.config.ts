@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
 // https://vitejs.dev/config/
-export default defineConfig(() => ({
+export default defineConfig(({ mode }) => ({
   base: '/',
   server: {
     host: "::",
@@ -11,9 +11,10 @@ export default defineConfig(() => ({
     allowedHosts: ['.ngrok.io'],
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: mode === 'test' ? 'https://sat-backend.ngrok.io' : 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
+        headers: mode === 'test' ? { 'ngrok-skip-browser-warning': 'true' } : {},
       }
     }
   },
