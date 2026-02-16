@@ -11,12 +11,12 @@ const scrollToSection = (sectionId: string) => {
 
 export const Hero = () => {
   return (
-    <section className="pt-32 pb-20 px-4 bg-gradient-to-b from-background to-muted/30">
+    <section className="pt-24 sm:pt-32 pb-12 sm:pb-20 px-4 bg-gradient-to-b from-background to-muted/30">
       <div className="container mx-auto max-w-5xl text-center">
         <div className="inline-block mb-4 animate-fade-in">
           <span className="text-sm font-semibold tracking-wider uppercase text-primary">Adquion Platform</span>
         </div>
-        <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 animate-slide-up leading-tight">
+        <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 animate-slide-up leading-tight">
           Automatización Fiscal{" "}
           <span className="text-gradient">Inteligente</span>
         </h1>

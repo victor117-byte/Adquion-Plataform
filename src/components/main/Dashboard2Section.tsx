@@ -673,7 +673,7 @@ export function Dashboard2Section() {
 
       {/* PDF Viewer Dialog */}
       <Dialog open={selectedDeclaracion !== null} onOpenChange={(open) => { if (!open) handleClosePdf(); }}>
-        <DialogContent className="max-w-5xl w-[95vw] h-[95vh] sm:h-[90vh] flex flex-col p-0">
+        <DialogContent className="max-w-5xl w-full sm:w-[95vw] h-[100dvh] sm:h-[90vh] sm:rounded-lg rounded-none flex flex-col p-0">
           <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b shrink-0">
             <div className="flex items-start justify-between gap-4">
               <div>
