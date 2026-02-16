@@ -12,13 +12,12 @@ export interface Declaracion {
   total_a_pagar_unico: number;
   estatus_pago: "Pagado" | "Pendiente" | "Vencido";
   fecha_de_pago: string | null;
-  fecha_hasta: string | null;
+  vigente_hasta: string | null;
   ejercicio: string | null;
   periodo_de_declaracion: string | null;
   num_de_operacion: string | null;
   tiene_pdf: boolean;
-  pdf_base64: string | null;
-  pdf_pago: string | null;
+  tiene_pdf_pago: boolean;
   ruta_pago: string | null;
 }
 
@@ -64,41 +63,58 @@ interface InitializeResponse {
   message: string;
 }
 
+interface PdfResponse {
+  success: boolean;
+  pdf_base64: string | null;
+  rfc: string;
+}
+
 // ==================== HOOK PDF ====================
 
-export function usePdfViewer() {
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+export function usePdfViewer(organizacion: string | undefined) {
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const verPdf = useCallback((base64: string | null) => {
-    if (!base64) {
-      setError("No hay PDF disponible");
-      return;
-    }
-    setError(null);
-    try {
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Uint8Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+  const fetchPdf = useCallback(
+    async (numDeOperacion: string, tabla: "py_declaracion" | "py_pago") => {
+      if (!organizacion || !numDeOperacion) {
+        setError("No hay PDF disponible");
+        return null;
       }
-      const blob = new Blob([byteNumbers], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
-    } catch {
-      setError("Error al procesar el PDF");
-    }
-  }, []);
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({
+          organizacion,
+          num_de_operacion: numDeOperacion,
+          tabla,
+        });
+        const res = await fetchAPI<PdfResponse>(
+          `/dashboard-declaraciones/pdf?${params.toString()}`
+        );
+        if (!res.success || !res.pdf_base64) {
+          setError("PDF no disponible");
+          return null;
+        }
+        setPdfBase64(res.pdf_base64);
+        return res.pdf_base64;
+      } catch {
+        setError("Error al obtener el PDF");
+        return null;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [organizacion]
+  );
 
   const cerrarPdf = useCallback(() => {
-    if (pdfUrl) {
-      URL.revokeObjectURL(pdfUrl);
-      setPdfUrl(null);
-    }
+    setPdfBase64(null);
     setError(null);
-  }, [pdfUrl]);
+  }, []);
 
-  return { pdfUrl, verPdf, cerrarPdf, error };
+  return { pdfBase64, fetchPdf, cerrarPdf, loading, error };
 }
 
 // ==================== HOOK PRINCIPAL ====================
