@@ -294,9 +294,17 @@ const statusConfig: Record<string, { className: string }> = {
 
 /** Construye los parámetros de búsqueda de PDF a partir de una declaración */
 function buildPdfLookup(d: Declaracion, tipo: "declaracion" | "pago" = "declaracion"): PdfLookupParams {
+  if (tipo === "pago") {
+    // Para pagos: num_operacion_pago o rfc + linea_de_captura
+    return {
+      num_de_operacion: d.num_operacion_pago,
+      rfc: d.rfc,
+      linea_de_captura: d.linea_de_captura,
+    };
+  }
+  // Para declaraciones: 3 estrategias (num_de_operacion, rfc+linea, rfc+ejercicio+periodo)
   return {
-    // Para pagos usamos num_operacion_pago, para declaraciones num_de_operacion
-    num_de_operacion: tipo === "pago" ? d.num_operacion_pago : d.num_de_operacion,
+    num_de_operacion: d.num_de_operacion,
     rfc: d.rfc,
     linea_de_captura: d.linea_de_captura,
     ejercicio: d.ejercicio,
@@ -554,12 +562,6 @@ export function Dashboard2Section() {
               {totalPagar > 0 ? formatCurrency(totalPagar) : "—"}
             </p>
           </div>
-          {d.concepto_de_pago && (
-            <div className="col-span-2">
-              <p className="text-xs text-muted-foreground">Concepto</p>
-              <p className="text-sm">{d.concepto_de_pago}</p>
-            </div>
-          )}
           {impFavor > 0 && (
             <div className="col-span-2">
               <p className="text-xs text-muted-foreground">Impuesto a Favor</p>

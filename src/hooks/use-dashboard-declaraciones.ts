@@ -124,6 +124,8 @@ export function usePdfViewer(organizacion: string | undefined) {
         if (lookup.ejercicio) params.set("ejercicio", lookup.ejercicio);
         if (lookup.periodo_de_declaracion) params.set("periodo", lookup.periodo_de_declaracion);
 
+        console.log(`[PDF] Fetching ${tabla}:`, Object.fromEntries(params));
+
         const res = await fetchAPI<PdfResponse>(
           `/dashboard-declaraciones/pdf?${params.toString()}`
         );
@@ -133,8 +135,10 @@ export function usePdfViewer(organizacion: string | undefined) {
         }
         setPdfBase64(res.pdf_base64);
         return res.pdf_base64;
-      } catch {
-        setError("Error al obtener el PDF");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error al obtener el PDF";
+        console.error(`[PDF] Error ${tabla}:`, msg);
+        setError(msg);
         return null;
       } finally {
         setLoading(false);
@@ -227,6 +231,18 @@ export function useDashboardDeclaraciones(
       const res = await fetchAPI<DashboardResponse>(
         `/dashboard-declaraciones?${params.toString()}`
       );
+      // Debug: verificar que la API devuelve los campos de pago
+      if (res.data?.length > 0) {
+        const sample = res.data[0];
+        console.log("[Dashboard] Campos muestra:", {
+          tiene_pdf: sample.tiene_pdf,
+          tiene_pdf_pago: sample.tiene_pdf_pago,
+          num_operacion_pago: sample.num_operacion_pago,
+          num_de_operacion: sample.num_de_operacion,
+        });
+        const conPago = res.data.filter(d => d.tiene_pdf_pago);
+        console.log(`[Dashboard] ${conPago.length}/${res.data.length} registros con tiene_pdf_pago=true`);
+      }
       setData(res.data);
       setKpis(res.kpis);
       setPagination(res.pagination);

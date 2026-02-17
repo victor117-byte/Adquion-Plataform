@@ -1,8 +1,8 @@
 # API Dashboard Declaraciones v2
 
 > **Base URL**: `/api/dashboard-declaraciones`
-> **Version**: 2.1.0
-> **Fecha**: 2026-02-11
+> **Version**: 2.2.0
+> **Fecha**: 2026-02-17
 
 ---
 
@@ -108,18 +108,22 @@ Este filtrado aplica a:
 | Campo | Tipo | Descripcion |
 |-------|------|-------------|
 | `razon_social` | TEXT | Razon social |
-| `rfc` | TEXT | RFC |
+| `rfc` | TEXT | RFC del contribuyente |
 | `fecha_y_hora_presentacion` | TEXT | Fecha de presentacion (texto original) |
-| `linea_de_captura` | TEXT | Linea de captura |
+| `linea_de_captura` | TEXT | Linea de captura (unica por operacion, puede ser null si impuesto a favor) |
 | `impuesto_a_favor` | TEXT | Impuesto a favor |
-| `concepto_de_pago` | TEXT | Concepto de pago |
 | `ejercicio` | TEXT | Ano fiscal |
 | `periodo_de_declaracion` | TEXT | Periodo |
-| `num_de_operacion` | TEXT | Numero de operacion SAT (identificador para obtener PDF) |
+| `num_de_operacion` | TEXT | Numero de operacion SAT de la declaracion (puede ser null) |
 | `total_a_pagar_unico` | DECIMAL(18,2) | Monto deduplicado (solo cuenta 1 vez por linea de captura) |
 | `estatus_pago` | TEXT | `Pagado`, `Pendiente` o `Vencido` |
 | `fecha_de_pago` | TEXT | Fecha de pago (si existe) |
-| `pdf_base64` | TEXT | PDF en base64 (no se envia en listado, solo via endpoint /pdf) |
+| `vigente_hasta` | TEXT | Fecha de vigencia de la linea de captura |
+| `tiene_pdf` | BOOLEAN | Indica si la declaracion tiene PDF disponible |
+| `tiene_pdf_pago` | BOOLEAN | Indica si el pago asociado tiene PDF disponible |
+| `num_operacion_pago` | TEXT | Numero de operacion del pago (para obtener PDF de pago) |
+
+> **Importante**: `pdf_base64` NO se incluye en el listado. Se obtiene via el endpoint `/pdf`.
 
 **Logica de Estatus:**
 - **Pagado**: Existe registro en `py_pago` con `fecha_de_pago` no vacia
@@ -166,16 +170,35 @@ GET /api/dashboard-declaraciones?organizacion={org}
       "razon_social": "Empresa SA de CV",
       "rfc": "XAXX010101000",
       "fecha_y_hora_presentacion": "15/01/2026 10:30:00",
-      "linea_de_captura": "ABC123456789",
+      "linea_de_captura": "0426 04XB 9900 4857 6224",
       "impuesto_a_favor": null,
       "total_a_pagar_unico": 1500.00,
-      "concepto_de_pago": "ISR",
-      "estatus_pago": "Pendiente",
-      "fecha_de_pago": null,
+      "estatus_pago": "Pagado",
+      "fecha_de_pago": "16/01/2026",
+      "vigente_hasta": "31/01/2026",
       "ejercicio": "2026",
       "periodo_de_declaracion": "Enero",
       "num_de_operacion": "OP2026010112345",
-      "tiene_pdf": true
+      "tiene_pdf": true,
+      "tiene_pdf_pago": true,
+      "num_operacion_pago": "250900001976"
+    },
+    {
+      "razon_social": "Empresa SA de CV",
+      "rfc": "XAXX010101000",
+      "fecha_y_hora_presentacion": "15/02/2026 09:00:00",
+      "linea_de_captura": null,
+      "impuesto_a_favor": "500.00",
+      "total_a_pagar_unico": 0,
+      "estatus_pago": "Pagado",
+      "fecha_de_pago": null,
+      "vigente_hasta": null,
+      "ejercicio": "2026",
+      "periodo_de_declaracion": "Febrero",
+      "num_de_operacion": null,
+      "tiene_pdf": true,
+      "tiene_pdf_pago": false,
+      "num_operacion_pago": null
     }
   ],
   "pagination": {
@@ -204,7 +227,11 @@ GET /api/dashboard-declaraciones?organizacion={org}
 }
 ```
 
-> **Nota**: El campo `tiene_pdf` indica si hay un PDF disponible para esa declaracion. El contenido del PDF NO se incluye en el listado para mantener la respuesta ligera. Para obtener el PDF, usar el endpoint `/pdf`.
+> **Nota sobre PDFs**: Los campos `tiene_pdf` y `tiene_pdf_pago` indican si hay PDF disponible. El contenido (base64) NO se incluye en el listado. Para obtenerlo, usar el endpoint `/pdf`.
+>
+> **Campos clave para obtener PDFs**:
+> - **PDF Declaracion**: Usar `num_de_operacion` (si existe), o `rfc` + `linea_de_captura`, o `rfc` + `ejercicio` + `periodo_de_declaracion`
+> - **PDF Pago**: Usar `num_operacion_pago` como `num_de_operacion` con `tabla=py_pago`, o `rfc` + `linea_de_captura` con `tabla=py_pago`
 
 ---
 
@@ -434,13 +461,15 @@ interface DeclaracionRow {
   linea_de_captura: string | null;
   impuesto_a_favor: string | null;
   total_a_pagar_unico: number;
-  concepto_de_pago: string | null;
   estatus_pago: 'Pagado' | 'Pendiente' | 'Vencido';
   fecha_de_pago: string | null;
+  vigente_hasta: string | null;
   ejercicio: string | null;
   periodo_de_declaracion: string | null;
   num_de_operacion: string | null;
   tiene_pdf: boolean;
+  tiene_pdf_pago: boolean;
+  num_operacion_pago: string | null;
 }
 
 interface FiltrosDeclaraciones {
