@@ -211,16 +211,74 @@ GET /api/dashboard-declaraciones?organizacion={org}
 ### 2. Obtener PDF de Declaracion/Pago
 
 ```http
-GET /api/dashboard-declaraciones/pdf?organizacion={org}&num_de_operacion={num}&tabla={tabla}
+GET /api/dashboard-declaraciones/pdf?organizacion={org}&...
 ```
+
+Soporta **3 estrategias de busqueda** (usa la primera disponible):
+
+1. **Por `num_de_operacion`** — cuando el campo existe (16% de registros)
+2. **Por `rfc` + `linea_de_captura`** — declaraciones con pago pendiente/realizado (44%)
+3. **Por `rfc` + `ejercicio` + `periodo`** — declaraciones con impuesto a favor, sin linea de captura (40%)
 
 #### Parametros de Query
 
 | Parametro | Tipo | Requerido | Descripcion |
 |-----------|------|-----------|-------------|
 | `organizacion` | string | Si | Nombre de la organizacion |
-| `num_de_operacion` | string | Si | Numero de operacion de la declaracion o pago |
 | `tabla` | string | No | `py_declaracion` (default) o `py_pago` |
+| `num_de_operacion` | string | Condicional | Numero de operacion SAT (si existe) |
+| `rfc` | string | Condicional | RFC del contribuyente (requerido si no hay num_de_operacion) |
+| `linea_de_captura` | string | No | Linea de captura (unica por operacion, si existe) |
+| `ejercicio` | string | No | Ano fiscal (para desambiguar cuando no hay linea_de_captura) |
+| `periodo` | string | No | Periodo de declaracion (para desambiguar cuando no hay linea_de_captura) |
+
+> **Regla**: Se requiere al menos `num_de_operacion` **o** `rfc`. Si no se envia ninguno, retorna 400.
+
+#### Logica de busqueda del backend
+
+**py_declaracion:**
+```
+si num_de_operacion existe:
+    buscar por num_de_operacion
+sino si rfc existe:
+    si linea_de_captura existe:
+        buscar por rfc + linea_de_captura
+    sino:
+        buscar por rfc + ejercicio + periodo (caso impuesto a favor)
+```
+
+**py_pago:**
+```
+si num_de_operacion existe:
+    buscar por num_operacion
+sino si rfc + linea_de_captura existen:
+    buscar por rfc + linea_de_captura
+```
+
+> En ambos casos se ordena por `fecha_captura DESC` para obtener el registro mas reciente.
+
+#### Ejemplos de llamada
+
+```
+# --- DECLARACIONES (tabla=py_declaracion, default) ---
+
+# Con num_de_operacion (preferido cuando existe)
+GET /pdf?organizacion=mi_empresa&num_de_operacion=OP2026010112345
+
+# Con linea de captura (declaraciones con pago)
+GET /pdf?organizacion=mi_empresa&rfc=GOBB840106PN4&linea_de_captura=0426%2004XB%209900%204857%206224
+
+# Sin linea de captura (impuesto a favor)
+GET /pdf?organizacion=mi_empresa&rfc=GOBB840106PN4&ejercicio=2025&periodo=Diciembre
+
+# --- PAGOS (tabla=py_pago) ---
+
+# Con num_operacion_pago (todos los pagos lo tienen)
+GET /pdf?organizacion=mi_empresa&num_de_operacion=250900001976&tabla=py_pago
+
+# Fallback por rfc + linea de captura
+GET /pdf?organizacion=mi_empresa&rfc=GOBB840106PN4&linea_de_captura=0426%2004XB%209900%204857%206224&tabla=py_pago
+```
 
 #### Respuesta Exitosa (200)
 
@@ -454,22 +512,33 @@ export function useDashboardDeclaraciones(
 ### Hook para obtener y visualizar PDF
 
 ```typescript
+interface PdfLookupParams {
+  num_de_operacion?: string | null;
+  rfc?: string | null;
+  linea_de_captura?: string | null;
+  ejercicio?: string | null;
+  periodo_de_declaracion?: string | null;
+}
+
 export function usePdfViewer(organizacion: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const verPdf = useCallback(async (
-    numDeOperacion: string,
+    lookup: PdfLookupParams,
     tabla: 'py_declaracion' | 'py_pago' = 'py_declaracion'
   ) => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        organizacion,
-        num_de_operacion: numDeOperacion,
-        tabla,
-      });
+      const params = new URLSearchParams({ organizacion, tabla });
+
+      // Enviar todos los campos disponibles para maximizar la busqueda
+      if (lookup.num_de_operacion) params.set('num_de_operacion', lookup.num_de_operacion);
+      if (lookup.rfc) params.set('rfc', lookup.rfc);
+      if (lookup.linea_de_captura) params.set('linea_de_captura', lookup.linea_de_captura);
+      if (lookup.ejercicio) params.set('ejercicio', lookup.ejercicio);
+      if (lookup.periodo_de_declaracion) params.set('periodo', lookup.periodo_de_declaracion);
 
       const res = await fetch(`/api/dashboard-declaraciones/pdf?${params}`, {
         credentials: 'include',
@@ -526,7 +595,8 @@ function TablaDeclaraciones({ organizacion }: { organizacion: string }) {
           <th>Periodo</th>
           <th>Total a Pagar</th>
           <th>Estatus</th>
-          <th>PDF</th>
+          <th>PDF Declaracion</th>
+          <th>PDF Pago</th>
         </tr>
       </thead>
       <tbody>
@@ -539,12 +609,34 @@ function TablaDeclaraciones({ organizacion }: { organizacion: string }) {
             <td>${row.total_a_pagar_unico?.toFixed(2)}</td>
             <td>{row.estatus_pago}</td>
             <td>
-              {row.tiene_pdf && row.num_de_operacion ? (
+              {row.tiene_pdf ? (
                 <button
-                  onClick={() => verPdf(row.num_de_operacion!)}
+                  onClick={() => verPdf({
+                    num_de_operacion: row.num_de_operacion,
+                    rfc: row.rfc,
+                    linea_de_captura: row.linea_de_captura,
+                    ejercicio: row.ejercicio,
+                    periodo_de_declaracion: row.periodo_de_declaracion,
+                  })}
                   disabled={pdfLoading}
                 >
                   Ver PDF
+                </button>
+              ) : (
+                <span>-</span>
+              )}
+            </td>
+            <td>
+              {row.tiene_pdf_pago ? (
+                <button
+                  onClick={() => verPdf({
+                    num_de_operacion: row.num_operacion_pago,
+                    rfc: row.rfc,
+                    linea_de_captura: row.linea_de_captura,
+                  }, 'py_pago')}
+                  disabled={pdfLoading}
+                >
+                  Ver Pago
                 </button>
               ) : (
                 <span>-</span>

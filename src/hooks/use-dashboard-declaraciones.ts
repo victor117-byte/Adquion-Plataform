@@ -10,6 +10,7 @@ export interface Declaracion {
   linea_de_captura: string | null;
   impuesto_a_favor: string | null;
   total_a_pagar_unico: number;
+  concepto_de_pago: string | null;
   estatus_pago: "Pagado" | "Pendiente" | "Vencido";
   fecha_de_pago: string | null;
   vigente_hasta: string | null;
@@ -71,25 +72,53 @@ interface PdfResponse {
 
 // ==================== HOOK PDF ====================
 
+/**
+ * Parámetros de búsqueda para obtener un PDF.
+ * El backend usa la primera estrategia disponible:
+ * 1. num_de_operacion (si existe)
+ * 2. rfc + linea_de_captura (declaraciones con pago)
+ * 3. rfc + ejercicio + periodo (impuesto a favor, sin línea de captura)
+ */
+export interface PdfLookupParams {
+  num_de_operacion?: string | null;
+  rfc?: string | null;
+  linea_de_captura?: string | null;
+  ejercicio?: string | null;
+  periodo_de_declaracion?: string | null;
+}
+
 export function usePdfViewer(organizacion: string | undefined) {
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPdf = useCallback(
-    async (numDeOperacion: string, tabla: "py_declaracion" | "py_pago") => {
-      if (!organizacion || !numDeOperacion) {
+    async (
+      lookup: PdfLookupParams,
+      tabla: "py_declaracion" | "py_pago" = "py_declaracion"
+    ) => {
+      if (!organizacion) {
         setError("No hay PDF disponible");
         return null;
       }
+      // Necesitamos al menos num_de_operacion o rfc
+      if (!lookup.num_de_operacion && !lookup.rfc) {
+        setError("No hay PDF disponible");
+        return null;
+      }
+
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({
-          organizacion,
-          num_de_operacion: numDeOperacion,
-          tabla,
-        });
+        const params = new URLSearchParams({ organizacion, tabla });
+
+        // Enviar todos los campos disponibles — el backend elige la estrategia
+        if (lookup.num_de_operacion) params.set("num_de_operacion", lookup.num_de_operacion);
+        if (lookup.rfc) params.set("rfc", lookup.rfc);
+        if (lookup.linea_de_captura) params.set("linea_de_captura", lookup.linea_de_captura);
+        if (lookup.ejercicio) params.set("ejercicio", lookup.ejercicio);
+        if (lookup.periodo_de_declaracion) params.set("periodo", lookup.periodo_de_declaracion);
+
         const res = await fetchAPI<PdfResponse>(
           `/dashboard-declaraciones/pdf?${params.toString()}`
         );

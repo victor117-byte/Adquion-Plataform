@@ -20,6 +20,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  GripVertical,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ import {
   usePdfViewer,
   type Declaracion,
   type FiltrosDeclaraciones,
+  type PdfLookupParams,
 } from "@/hooks/use-dashboard-declaraciones";
 import {
   Dialog,
@@ -59,13 +61,24 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
 
 // ==================== PDF Renderer ====================
 
 const ZOOM_STEP = 0.2;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
+
+/** Convierte base64 a Uint8Array para evitar límites de data URI */
+function base64ToUint8Array(b64: string): Uint8Array {
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
 
 function PdfRenderer({
   base64,
@@ -78,107 +91,190 @@ function PdfRenderer({
 }) {
   const [numPages, setNumPages] = useState<number>(0);
   const [scale, setScale] = useState<number>(1);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState<number>(0);
 
-  useEffect(() => {
-    const el = containerRef.current;
+  // Callback ref para el ResizeObserver — se conecta cuando el div se monta
+  const observerRef = useRef<ResizeObserver | null>(null);
+  const setContainerRef = useCallback((el: HTMLDivElement | null) => {
+    // Desconectar observer anterior
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+    containerRef.current = el;
     if (!el) return;
-    const observer = new ResizeObserver((entries) => {
+    // Medir inmediatamente
+    setContainerWidth(el.clientWidth);
+    // Observar cambios de tamaño
+    observerRef.current = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContainerWidth(entry.contentRect.width);
       }
     });
-    observer.observe(el);
-    setContainerWidth(el.clientWidth);
-    return () => observer.disconnect();
+    observerRef.current.observe(el);
   }, []);
 
-  const file = useMemo(
-    () => (base64 ? `data:application/pdf;base64,${base64}` : null),
-    [base64]
-  );
+  // Limpiar observer al desmontar
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) observerRef.current.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    setNumPages(0);
+    setRenderError(null);
+  }, [base64]);
+
+  const file = useMemo(() => {
+    if (!base64) return null;
+    try {
+      return { data: base64ToUint8Array(base64) };
+    } catch {
+      return null;
+    }
+  }, [base64]);
 
   const zoomIn = useCallback(() => setScale((s) => Math.min(s + ZOOM_STEP, ZOOM_MAX)), []);
   const zoomOut = useCallback(() => setScale((s) => Math.max(s - ZOOM_STEP, ZOOM_MIN)), []);
   const zoomReset = useCallback(() => setScale(1), []);
   const zoomPercent = Math.round(scale * 100);
 
-  if (fetchLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-3">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Cargando documento...</p>
-      </div>
-    );
-  }
-
-  if (fetchError) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-2">
-        <AlertTriangle className="h-8 w-8 text-destructive" />
-        <p className="text-sm text-destructive">{fetchError}</p>
-      </div>
-    );
-  }
-
-  if (!file) return null;
-
-  // Base width for the PDF page (fit container at scale=1)
+  const displayError = fetchError || renderError;
+  const showPdf = !fetchLoading && !displayError && file;
   const pageWidth = containerWidth > 0 ? (containerWidth - 2) * scale : undefined;
 
   return (
     <div className="h-full flex flex-col gap-2">
-      {/* Zoom controls */}
-      <div className="flex items-center justify-center gap-1 shrink-0">
-        <Button variant="outline" size="icon" className="h-7 w-7" onClick={zoomOut} disabled={scale <= ZOOM_MIN} title="Reducir">
-          <ZoomOut className="h-3.5 w-3.5" />
-        </Button>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-mono min-w-[52px]" onClick={zoomReset} title="Restablecer zoom">
-          {zoomPercent}%
-        </Button>
-        <Button variant="outline" size="icon" className="h-7 w-7" onClick={zoomIn} disabled={scale >= ZOOM_MAX} title="Ampliar">
-          <ZoomIn className="h-3.5 w-3.5" />
-        </Button>
-        {scale !== 1 && (
-          <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={zoomReset} title="Restablecer">
-            <RotateCcw className="h-3 w-3" />
+      {/* Zoom controls — solo visibles cuando hay PDF */}
+      {showPdf && (
+        <div className="flex items-center justify-center gap-1 shrink-0">
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={zoomOut} disabled={scale <= ZOOM_MIN} title="Reducir">
+            <ZoomOut className="h-3.5 w-3.5" />
           </Button>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs font-mono min-w-[52px]" onClick={zoomReset} title="Restablecer zoom">
+            {zoomPercent}%
+          </Button>
+          <Button variant="outline" size="icon" className="h-7 w-7" onClick={zoomIn} disabled={scale >= ZOOM_MAX} title="Ampliar">
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+          {scale !== 1 && (
+            <Button variant="ghost" size="icon" className="h-7 w-7 ml-1" onClick={zoomReset} title="Restablecer">
+              <RotateCcw className="h-3 w-3" />
+            </Button>
+          )}
+          {numPages > 0 && (
+            <span className="text-xs text-muted-foreground ml-2">{numPages} pág.</span>
+          )}
+        </div>
+      )}
+
+      {/* Contenedor siempre montado para que el ref se conecte */}
+      <div ref={setContainerRef} className="flex-1 overflow-auto rounded-md border bg-muted/30 min-h-0">
+        {fetchLoading && (
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Cargando documento...</p>
+          </div>
         )}
-        {numPages > 0 && (
-          <span className="text-xs text-muted-foreground ml-2">{numPages} pág.</span>
+
+        {displayError && (
+          <div className="flex flex-col items-center justify-center h-full gap-2">
+            <AlertTriangle className="h-8 w-8 text-destructive" />
+            <p className="text-sm text-destructive">{displayError}</p>
+          </div>
         )}
-      </div>
-      {/* PDF scroll area */}
-      <div ref={containerRef} className="flex-1 overflow-auto rounded-md border bg-muted/30 min-h-0">
-        <Document
-          file={file}
-          onLoadSuccess={({ numPages: n }) => setNumPages(n)}
-          loading={
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          }
-          error={
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <AlertTriangle className="h-8 w-8 text-destructive" />
-              <p className="text-sm text-destructive">Error al cargar el PDF</p>
-            </div>
-          }
-        >
-          {Array.from({ length: numPages }, (_, i) => (
-            <Page
-              key={i + 1}
-              pageNumber={i + 1}
-              width={pageWidth}
-              className="mx-auto [&_canvas]:mx-auto"
-              loading={null}
-            />
-          ))}
-        </Document>
+
+        {!fetchLoading && !displayError && !file && (
+          <div className="flex flex-col items-center justify-center h-full gap-2">
+            <FileText className="h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">No hay PDF disponible</p>
+          </div>
+        )}
+
+        {showPdf && (
+          <Document
+            file={file}
+            onLoadSuccess={({ numPages: n }) => setNumPages(n)}
+            onLoadError={(err) => {
+              console.error("Error al cargar PDF:", err);
+              setRenderError("Error al procesar el PDF");
+            }}
+            loading={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            }
+            error={
+              <div className="flex flex-col items-center justify-center py-12 gap-2">
+                <AlertTriangle className="h-8 w-8 text-destructive" />
+                <p className="text-sm text-destructive">Error al cargar el PDF</p>
+              </div>
+            }
+          >
+            {Array.from({ length: numPages }, (_, i) => (
+              <Page
+                key={i + 1}
+                pageNumber={i + 1}
+                width={pageWidth}
+                className="mx-auto [&_canvas]:mx-auto"
+                loading={null}
+              />
+            ))}
+          </Document>
+        )}
       </div>
     </div>
   );
+}
+
+// ==================== Resizable Column Hook ====================
+
+const DEFAULT_COL_WIDTHS: Record<string, number> = {
+  razon_social: 180,
+  rfc: 140,
+  linea_de_captura: 160,
+  fecha_y_hora_presentacion: 150,
+  vigente_hasta: 100,
+  fecha_de_pago: 110,
+  impuesto_a_favor: 110,
+  total_a_pagar_unico: 110,
+  estatus_pago: 100,
+  acciones: 70,
+};
+
+const MIN_COL_WIDTH = 60;
+
+function useResizableColumns(defaults: Record<string, number>) {
+  const [widths, setWidths] = useState(defaults);
+  const dragging = useRef<{ col: string; startX: number; startW: number } | null>(null);
+
+  const onMouseDown = useCallback((col: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    dragging.current = { col, startX: e.clientX, startW: widths[col] };
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const diff = ev.clientX - dragging.current.startX;
+      const newW = Math.max(MIN_COL_WIDTH, dragging.current.startW + diff);
+      setWidths((prev) => ({ ...prev, [dragging.current!.col]: newW }));
+    };
+    const onMouseUp = () => {
+      dragging.current = null;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [widths]);
+
+  return { widths, onMouseDown };
 }
 
 // ==================== Helpers ====================
@@ -195,6 +291,17 @@ const statusConfig: Record<string, { className: string }> = {
   Pendiente: { className: "bg-warning/15 text-warning hover:bg-warning/20 border-0" },
   Vencido: { className: "bg-destructive/15 text-destructive hover:bg-destructive/20 border-0" },
 };
+
+/** Construye los parámetros de búsqueda de PDF a partir de una declaración */
+function buildPdfLookup(d: Declaracion): PdfLookupParams {
+  return {
+    num_de_operacion: d.num_de_operacion,
+    rfc: d.rfc,
+    linea_de_captura: d.linea_de_captura,
+    ejercicio: d.ejercicio,
+    periodo_de_declaracion: d.periodo_de_declaracion,
+  };
+}
 
 // ==================== Main Component ====================
 
@@ -240,11 +347,12 @@ export function Dashboard2Section() {
 
   const handleOpenPdfs = useCallback(async (d: Declaracion) => {
     setSelectedDeclaracion(d);
-    if (d.tiene_pdf && d.num_de_operacion) {
-      declaracionPdf.fetchPdf(d.num_de_operacion, "py_declaracion");
+    const lookup = buildPdfLookup(d);
+    if (d.tiene_pdf) {
+      declaracionPdf.fetchPdf(lookup, "py_declaracion");
     }
-    if (d.tiene_pdf_pago && d.num_de_operacion) {
-      pagoPdf.fetchPdf(d.num_de_operacion, "py_pago");
+    if (d.tiene_pdf_pago) {
+      pagoPdf.fetchPdf(lookup, "py_pago");
     }
   }, [declaracionPdf, pagoPdf]);
 
@@ -256,11 +364,20 @@ export function Dashboard2Section() {
 
   const downloadPdf = useCallback((base64: string | null, filename: string) => {
     if (!base64) return;
+    const bytes = atob(base64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    const blob = new Blob([arr], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = `data:application/pdf;base64,${base64}`;
+    link.href = url;
     link.download = filename;
     link.click();
+    URL.revokeObjectURL(url);
   }, []);
+
+  // Resizable columns
+  const { widths: colW, onMouseDown } = useResizableColumns(DEFAULT_COL_WIDTHS);
 
   const hasFilters = filterRfc || filterRazonSocial || filterEstado !== "all" || filterBusqueda;
 
@@ -320,14 +437,28 @@ export function Dashboard2Section() {
     );
   }
 
-  const SortableHeader = ({ field, children }: { field: string; children: React.ReactNode }) => (
+  // ---- Resizable header helper ----
+  const ResizableHeader = ({ col, field, children, className = "" }: {
+    col: string;
+    field?: string;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
     <TableHead
-      className="cursor-pointer select-none hover:text-foreground"
-      onClick={() => handleSort(field)}
+      className={`relative select-none ${field ? "cursor-pointer hover:text-foreground" : ""} ${className}`}
+      style={{ width: colW[col], minWidth: MIN_COL_WIDTH }}
+      onClick={field ? () => handleSort(field) : undefined}
     >
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 pr-3">
         {children}
-        <ArrowUpDown className={`h-3 w-3 ${sortBy === field ? "text-primary" : "text-muted-foreground/50"}`} />
+        {field && <ArrowUpDown className={`h-3 w-3 shrink-0 ${sortBy === field ? "text-primary" : "text-muted-foreground/50"}`} />}
+      </div>
+      {/* Resize handle */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center hover:bg-muted/50 z-10"
+        onMouseDown={(e) => { e.stopPropagation(); onMouseDown(col, e); }}
+      >
+        <GripVertical className="h-3 w-3 text-muted-foreground/30" />
       </div>
     </TableHead>
   );
@@ -339,22 +470,24 @@ export function Dashboard2Section() {
 
     return (
       <TableRow key={`${d.rfc}-${d.linea_de_captura}-${index}`}>
-        <TableCell className="font-medium max-w-[200px] truncate" title={d.razon_social || ""}>
+        <TableCell className="font-medium truncate" style={{ maxWidth: colW.razon_social }} title={d.razon_social || ""}>
           {d.razon_social}
         </TableCell>
-        <TableCell className="font-mono text-sm">{d.rfc}</TableCell>
-        <TableCell className="text-sm">{d.fecha_y_hora_presentacion}</TableCell>
-        <TableCell className="font-mono text-sm">{d.linea_de_captura}</TableCell>
-        <TableCell className="text-sm">{d.vigente_hasta || "—"}</TableCell>
-        <TableCell className="text-sm">{d.fecha_de_pago || "—"}</TableCell>
-        <TableCell className="text-right">
+        <TableCell className="font-mono text-xs">{d.rfc}</TableCell>
+        <TableCell className="font-mono text-xs truncate" style={{ maxWidth: colW.linea_de_captura }} title={d.linea_de_captura || ""}>
+          {d.linea_de_captura}
+        </TableCell>
+        <TableCell className="text-xs">{d.fecha_y_hora_presentacion}</TableCell>
+        <TableCell className="text-xs">{d.vigente_hasta || "—"}</TableCell>
+        <TableCell className="text-xs">{d.fecha_de_pago || "—"}</TableCell>
+        <TableCell className="text-right text-xs">
           {impFavor > 0 ? (
             <span className="text-success font-medium">{formatCurrency(impFavor)}</span>
           ) : (
             <span className="text-muted-foreground">—</span>
           )}
         </TableCell>
-        <TableCell className="text-right">
+        <TableCell className="text-right text-xs">
           {totalPagar > 0 ? (
             <span className="font-medium">{formatCurrency(totalPagar)}</span>
           ) : (
@@ -362,7 +495,7 @@ export function Dashboard2Section() {
           )}
         </TableCell>
         <TableCell className="text-center">
-          <Badge variant="secondary" className={status.className}>
+          <Badge variant="secondary" className={status.className + " text-[10px] px-1.5 py-0"}>
             {d.estatus_pago}
           </Badge>
         </TableCell>
@@ -373,7 +506,7 @@ export function Dashboard2Section() {
                 <Eye className="h-3.5 w-3.5" />
               </Button>
             ) : (
-              <span className="text-muted-foreground">—</span>
+              <span className="text-muted-foreground text-xs">—</span>
             )}
           </div>
         </TableCell>
@@ -419,6 +552,12 @@ export function Dashboard2Section() {
               {totalPagar > 0 ? formatCurrency(totalPagar) : "—"}
             </p>
           </div>
+          {d.concepto_de_pago && (
+            <div className="col-span-2">
+              <p className="text-xs text-muted-foreground">Concepto</p>
+              <p className="text-sm">{d.concepto_de_pago}</p>
+            </div>
+          )}
           {impFavor > 0 && (
             <div className="col-span-2">
               <p className="text-xs text-muted-foreground">Impuesto a Favor</p>
@@ -573,23 +712,19 @@ export function Dashboard2Section() {
         <>
           <Card className="hidden md:block overflow-hidden">
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <SortableHeader field="razon_social">Razón Social</SortableHeader>
-                    <SortableHeader field="rfc">RFC</SortableHeader>
-                    <SortableHeader field="fecha_y_hora_presentacion">Fecha de Presentación</SortableHeader>
-                    <SortableHeader field="linea_de_captura">Línea de Captura</SortableHeader>
-                    <SortableHeader field="vigente_hasta">Vigencia</SortableHeader>
-                    <SortableHeader field="fecha_de_pago">Fecha de Pago</SortableHeader>
-                    <TableHead className="text-right">Impuesto a Favor</TableHead>
-                    <SortableHeader field="total_a_pagar_unico">
-                      <span className="ml-auto">Total a Pagar</span>
-                    </SortableHeader>
-                    <SortableHeader field="estatus_pago">
-                      <span className="mx-auto">Estado</span>
-                    </SortableHeader>
-                    <TableHead className="text-center">Acciones</TableHead>
+                    <ResizableHeader col="razon_social" field="razon_social">Razón Social</ResizableHeader>
+                    <ResizableHeader col="rfc" field="rfc">RFC</ResizableHeader>
+                    <ResizableHeader col="linea_de_captura" field="linea_de_captura">Línea de Captura</ResizableHeader>
+                    <ResizableHeader col="fecha_y_hora_presentacion" field="fecha_y_hora_presentacion">Presentación</ResizableHeader>
+                    <ResizableHeader col="vigente_hasta" field="vigente_hasta">Vigencia</ResizableHeader>
+                    <ResizableHeader col="fecha_de_pago" field="fecha_de_pago">Fecha Pago</ResizableHeader>
+                    <ResizableHeader col="impuesto_a_favor" className="text-right">Imp. a Favor</ResizableHeader>
+                    <ResizableHeader col="total_a_pagar_unico" field="total_a_pagar_unico" className="text-right">Total a Pagar</ResizableHeader>
+                    <ResizableHeader col="estatus_pago" field="estatus_pago" className="text-center">Estado</ResizableHeader>
+                    <TableHead className="text-center" style={{ width: colW.acciones, minWidth: MIN_COL_WIDTH }}>Ver</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -627,41 +762,17 @@ export function Dashboard2Section() {
             Página {pagination.page} de {pagination.total_pages} — {pagination.total} declaraciones
           </p>
           <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={!pagination.has_prev}
-              onClick={() => setPage(1)}
-            >
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={!pagination.has_prev} onClick={() => setPage(1)}>
               <ChevronsLeft className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={!pagination.has_prev}
-              onClick={() => setPage(page - 1)}
-            >
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={!pagination.has_prev} onClick={() => setPage(page - 1)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="px-3 text-sm font-medium">{pagination.page}</span>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={!pagination.has_next}
-              onClick={() => setPage(page + 1)}
-            >
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={!pagination.has_next} onClick={() => setPage(page + 1)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              disabled={!pagination.has_next}
-              onClick={() => setPage(pagination.total_pages)}
-            >
+            <Button variant="outline" size="icon" className="h-8 w-8" disabled={!pagination.has_next} onClick={() => setPage(pagination.total_pages)}>
               <ChevronsRight className="h-4 w-4" />
             </Button>
           </div>
