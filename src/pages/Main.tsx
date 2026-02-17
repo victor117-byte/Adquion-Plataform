@@ -77,6 +77,7 @@ const menuPermissions: Record<string, SectionType[]> = {
     // 'automations',
     'notifications',
     'powerbi',
+    'settings',
   ],
 };
 
@@ -247,7 +248,7 @@ export default function Main() {
       case 'powerbi':
         return <PowerBISection />;
       case 'settings':
-        return isAdmin ? <SettingsSection /> : <Navigate to="/main" replace />;
+        return <SettingsSection />;
       case 'subscription':
         return <SubscriptionSection />;
       default:

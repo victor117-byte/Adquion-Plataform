@@ -192,8 +192,10 @@ export function useDashboardDeclaraciones(
         }
       );
       setInitialized(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al inicializar");
+    } catch {
+      // Si falla (ej: usuario no es admin), intentar cargar datos de todas formas.
+      // La vista puede existir ya (creada por un admin previamente).
+      setInitialized(true);
     } finally {
       setInitializing(false);
     }
