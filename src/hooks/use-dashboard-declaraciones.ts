@@ -17,6 +17,7 @@ export interface Declaracion {
   ejercicio: string | null;
   periodo_de_declaracion: string | null;
   num_de_operacion: string | null;
+  num_operacion_pago: string | null;
   tiene_pdf: boolean;
   tiene_pdf_pago: boolean;
   ruta_pago: string | null;
@@ -78,6 +79,10 @@ interface PdfResponse {
  * 1. num_de_operacion (si existe)
  * 2. rfc + linea_de_captura (declaraciones con pago)
  * 3. rfc + ejercicio + periodo (impuesto a favor, sin línea de captura)
+ * 
+ * Para pagos (tabla=py_pago):
+ * - num_de_operacion corresponde al num_operacion de la tabla py_pago
+ * - Se busca por num_operacion o por rfc + linea_de_captura
  */
 export interface PdfLookupParams {
   num_de_operacion?: string | null;

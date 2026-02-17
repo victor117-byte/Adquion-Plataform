@@ -293,9 +293,10 @@ const statusConfig: Record<string, { className: string }> = {
 };
 
 /** Construye los parámetros de búsqueda de PDF a partir de una declaración */
-function buildPdfLookup(d: Declaracion): PdfLookupParams {
+function buildPdfLookup(d: Declaracion, tipo: "declaracion" | "pago" = "declaracion"): PdfLookupParams {
   return {
-    num_de_operacion: d.num_de_operacion,
+    // Para pagos usamos num_operacion_pago, para declaraciones num_de_operacion
+    num_de_operacion: tipo === "pago" ? d.num_operacion_pago : d.num_de_operacion,
     rfc: d.rfc,
     linea_de_captura: d.linea_de_captura,
     ejercicio: d.ejercicio,
@@ -347,12 +348,13 @@ export function Dashboard2Section() {
 
   const handleOpenPdfs = useCallback(async (d: Declaracion) => {
     setSelectedDeclaracion(d);
-    const lookup = buildPdfLookup(d);
     if (d.tiene_pdf) {
-      declaracionPdf.fetchPdf(lookup, "py_declaracion");
+      const lookupDeclaracion = buildPdfLookup(d, "declaracion");
+      declaracionPdf.fetchPdf(lookupDeclaracion, "py_declaracion");
     }
     if (d.tiene_pdf_pago) {
-      pagoPdf.fetchPdf(lookup, "py_pago");
+      const lookupPago = buildPdfLookup(d, "pago");
+      pagoPdf.fetchPdf(lookupPago, "py_pago");
     }
   }, [declaracionPdf, pagoPdf]);
 
