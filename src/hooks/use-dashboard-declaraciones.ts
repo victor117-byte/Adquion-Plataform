@@ -124,8 +124,6 @@ export function usePdfViewer(organizacion: string | undefined) {
         if (lookup.ejercicio) params.set("ejercicio", lookup.ejercicio);
         if (lookup.periodo_de_declaracion) params.set("periodo", lookup.periodo_de_declaracion);
 
-        console.log(`[PDF] Fetching ${tabla}:`, Object.fromEntries(params));
-
         const res = await fetchAPI<PdfResponse>(
           `/dashboard-declaraciones/pdf?${params.toString()}`
         );
@@ -137,7 +135,6 @@ export function usePdfViewer(organizacion: string | undefined) {
         return res.pdf_base64;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Error al obtener el PDF";
-        console.error(`[PDF] Error ${tabla}:`, msg);
         setError(msg);
         return null;
       } finally {
@@ -155,6 +152,73 @@ export function usePdfViewer(organizacion: string | undefined) {
   return { pdfBase64, fetchPdf, cerrarPdf, loading, error };
 }
 
+// ==================== USUARIO ====================
+
+export interface Usuario {
+  id: number;
+  nombre: string;
+  correo: string;
+  tipo_usuario: string;
+  total_contribuyentes: number;
+}
+
+export function useEjercicios(
+  organizacion: string | undefined,
+  contadorId?: number
+) {
+  const [ejercicios, setEjercicios] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!organizacion) return;
+    const fetchEjercicios = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ organizacion });
+        if (contadorId) params.set("contador_id", String(contadorId));
+        const res = await fetchAPI<{ success: boolean; ejercicios: string[] }>(
+          `/dashboard-declaraciones/ejercicios?${params.toString()}`
+        );
+        setEjercicios(res.ejercicios || []);
+      } catch {
+        setEjercicios([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEjercicios();
+  }, [organizacion, contadorId]);
+
+  return { ejercicios, loading };
+}
+
+export function useUsuarios(organizacion: string | undefined) {
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!organizacion) return;
+    const fetchUsuarios = async () => {
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({ organizacion });
+        const res = await fetchAPI<{ success: boolean; usuarios: Usuario[] }>(
+          `/dashboard-declaraciones/usuarios?${params.toString()}`
+        );
+        setUsuarios(res.usuarios || []);
+      } catch {
+        // No es admin o endpoint no disponible
+        setUsuarios([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsuarios();
+  }, [organizacion]);
+
+  return { usuarios, loading };
+}
+
 // ==================== HOOK PRINCIPAL ====================
 
 export function useDashboardDeclaraciones(
@@ -163,7 +227,8 @@ export function useDashboardDeclaraciones(
   page = 1,
   limit = 20,
   sortBy?: string,
-  sortOrder?: "asc" | "desc"
+  sortOrder?: "asc" | "desc",
+  contadorId?: number
 ) {
   const [data, setData] = useState<Declaracion[]>([]);
   const [kpis, setKpis] = useState<KPIs | null>(null);
@@ -229,22 +294,11 @@ export function useDashboardDeclaraciones(
       if (parsedFiltros.busqueda) params.set("busqueda", parsedFiltros.busqueda);
       if (sortBy) params.set("sort_by", sortBy);
       if (sortOrder) params.set("sort_order", sortOrder);
+      if (contadorId) params.set("contador_id", String(contadorId));
 
       const res = await fetchAPI<DashboardResponse>(
         `/dashboard-declaraciones?${params.toString()}`
       );
-      // Debug: verificar que la API devuelve los campos de pago
-      if (res.data?.length > 0) {
-        const sample = res.data[0];
-        console.log("[Dashboard] Campos muestra:", {
-          tiene_pdf: sample.tiene_pdf,
-          tiene_pdf_pago: sample.tiene_pdf_pago,
-          num_operacion_pago: sample.num_operacion_pago,
-          num_de_operacion: sample.num_de_operacion,
-        });
-        const conPago = res.data.filter(d => d.tiene_pdf_pago);
-        console.log(`[Dashboard] ${conPago.length}/${res.data.length} registros con tiene_pdf_pago=true`);
-      }
       setData(res.data);
       setKpis(res.kpis);
       setPagination(res.pagination);
@@ -253,7 +307,7 @@ export function useDashboardDeclaraciones(
     } finally {
       setLoading(false);
     }
-  }, [organizacion, initialized, filtrosKey, page, limit, sortBy, sortOrder]);
+  }, [organizacion, initialized, filtrosKey, page, limit, sortBy, sortOrder, contadorId]);
 
   // Check initialization on mount — auto-init if needed
   useEffect(() => {

@@ -37,7 +37,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -45,6 +47,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   useDashboardDeclaraciones,
   usePdfViewer,
+  useEjercicios,
+  useUsuarios,
   type Declaracion,
   type FiltrosDeclaraciones,
   type PdfLookupParams,
@@ -317,12 +321,15 @@ function buildPdfLookup(d: Declaracion, tipo: "declaracion" | "pago" = "declarac
 export function Dashboard2Section() {
   const { user } = useAuth();
   const organizacion = user?.organizacionActiva?.database;
+  const isAdmin = user?.tipo_usuario === "administrador";
 
   // Filtros
   const [filterRfc, setFilterRfc] = useState("");
   const [filterRazonSocial, setFilterRazonSocial] = useState("");
   const [filterEstado, setFilterEstado] = useState("all");
   const [filterBusqueda, setFilterBusqueda] = useState("");
+  const [filterEjercicio, setFilterEjercicio] = useState("all");
+  const [selectedContadorId, setSelectedContadorId] = useState<number | undefined>();
 
   // Paginación
   const [page, setPage] = useState(1);
@@ -337,6 +344,7 @@ export function Dashboard2Section() {
     razon_social: filterRazonSocial || undefined,
     estatus_pago: filterEstado !== "all" ? filterEstado : undefined,
     busqueda: filterBusqueda || undefined,
+    ejercicio: filterEjercicio !== "all" ? filterEjercicio : undefined,
   };
 
   const {
@@ -347,7 +355,10 @@ export function Dashboard2Section() {
     error,
     initialized,
     initializing,
-  } = useDashboardDeclaraciones(organizacion, filtros, page, limit, sortBy, sortOrder);
+  } = useDashboardDeclaraciones(organizacion, filtros, page, limit, sortBy, sortOrder, selectedContadorId);
+
+  const { ejercicios } = useEjercicios(organizacion, selectedContadorId);
+  const { usuarios } = useUsuarios(isAdmin ? organizacion : undefined);
 
   // PDF viewers (on-demand)
   const declaracionPdf = usePdfViewer(organizacion);
@@ -389,13 +400,23 @@ export function Dashboard2Section() {
   // Resizable columns
   const { widths: colW, onMouseDown } = useResizableColumns(DEFAULT_COL_WIDTHS);
 
-  const hasFilters = filterRfc || filterRazonSocial || filterEstado !== "all" || filterBusqueda;
+  const hasFilters =
+    filterRfc || filterRazonSocial || filterEstado !== "all" || filterBusqueda ||
+    filterEjercicio !== "all" || selectedContadorId !== undefined;
 
   const clearFilters = () => {
     setFilterRfc("");
     setFilterRazonSocial("");
     setFilterEstado("all");
     setFilterBusqueda("");
+    setFilterEjercicio("all");
+    setSelectedContadorId(undefined);
+    setPage(1);
+  };
+
+  const handleContadorChange = (contadorId: number | undefined) => {
+    setSelectedContadorId(contadorId);
+    setFilterEjercicio("all"); // los años disponibles pueden variar por usuario
     setPage(1);
   };
 
@@ -656,7 +677,7 @@ export function Dashboard2Section() {
 
       {/* Filtros */}
       <Card className="p-4 sm:p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
           <div className="relative sm:col-span-2 lg:col-span-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -695,6 +716,58 @@ export function Dashboard2Section() {
               <SelectItem value="Vencido">Vencido</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={filterEjercicio} onValueChange={(v) => { setFilterEjercicio(v); setPage(1); }}>
+            <SelectTrigger>
+              <SelectValue placeholder="Año fiscal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los años</SelectItem>
+              {ejercicios.map((ej) => (
+                <SelectItem key={ej} value={ej}>{ej}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {isAdmin && usuarios.length > 0 && (
+            <Select
+              value={selectedContadorId !== undefined ? String(selectedContadorId) : "all"}
+              onValueChange={(v) => handleContadorChange(v === "all" ? undefined : Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Ver como..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los usuarios</SelectItem>
+                {(() => {
+                  const admins = usuarios.filter(u => u.tipo_usuario === "administrador");
+                  const contadores = usuarios.filter(u => u.tipo_usuario === "contador");
+                  return (
+                    <>
+                      {admins.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Administradores</SelectLabel>
+                          {admins.map(u => (
+                            <SelectItem key={u.id} value={String(u.id)}>
+                              {u.nombre} ({u.total_contribuyentes})
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {contadores.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Contadores</SelectLabel>
+                          {contadores.map(u => (
+                            <SelectItem key={u.id} value={String(u.id)}>
+                              {u.nombre} ({u.total_contribuyentes})
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                    </>
+                  );
+                })()}
+              </SelectContent>
+            </Select>
+          )}
           {hasFilters && (
             <Button variant="outline" onClick={clearFilters} className="gap-2">
               <X className="h-4 w-4" />
