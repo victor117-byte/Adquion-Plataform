@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
-const NGROK_BACKEND = 'https://sat-backend.ngrok.io';
+const NGROK_BACKEND = 'https://adquion-backend.ngrok.io';
 const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' };
 
 // https://vitejs.dev/config/
