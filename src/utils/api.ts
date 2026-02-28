@@ -69,8 +69,8 @@ function notifyLimitExceeded(error: LimitExceededError): void {
 export function getHeaders(includeContentType: boolean = true): Record<string, string> {
   const headers: Record<string, string> = {};
 
-  // Incluir ngrok header en desarrollo y test (evita error CORS en producción)
-  if (!import.meta.env.PROD) {
+  // Incluir ngrok header siempre que el backend sea ngrok (dev o prod)
+  if (API_BASE.includes('ngrok') || !import.meta.env.PROD) {
     headers['ngrok-skip-browser-warning'] = 'true';
   }
 
