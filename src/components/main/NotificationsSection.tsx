@@ -3,6 +3,7 @@ import { Bell, Mail, MessageSquare, Check, Trash2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { WhatsAppSection } from "@/components/main/WhatsAppSection";
 
 interface Notification {
   id: string;
@@ -168,130 +170,149 @@ export function NotificationsSection() {
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Notificaciones</h1>
-            {unreadCount > 0 && (
-              <Badge className="bg-primary text-primary-foreground">
-                {unreadCount} sin leer
-              </Badge>
-            )}
-          </div>
-          <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-            Historial de notificaciones y alertas
-          </p>
-        </div>
-        {unreadCount > 0 && (
-          <Button variant="outline" onClick={handleMarkAllAsRead} className="w-full sm:w-auto">
-            <Check className="h-4 w-4 mr-2" />
-            Marcar todo como leído
-          </Button>
-        )}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Notificaciones</h1>
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+          Alertas del sistema y configuración del chatbot de WhatsApp
+        </p>
       </div>
 
-      {/* Filters */}
-      <Card className="p-3 sm:p-4">
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-          <div className="flex gap-2 flex-1">
-            <Select value={filterChannel} onValueChange={setFilterChannel}>
-              <SelectTrigger className="flex-1 sm:w-40 sm:flex-none">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Canal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los canales</SelectItem>
-                <SelectItem value="system">Sistema</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-                <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterRead} onValueChange={setFilterRead}>
-              <SelectTrigger className="flex-1 sm:w-36 sm:flex-none">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="unread">Sin leer</SelectItem>
-                <SelectItem value="read">Leídas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </Card>
+      <Tabs defaultValue="alertas">
+        <TabsList className="grid w-full grid-cols-2 max-w-sm">
+          <TabsTrigger value="alertas" className="flex items-center gap-1.5">
+            <Bell className="h-3.5 w-3.5" />
+            Alertas
+            {unreadCount > 0 && (
+              <Badge className="ml-1 h-4 min-w-4 px-1 text-[10px] bg-primary text-primary-foreground">
+                {unreadCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="whatsapp" className="flex items-center gap-1.5">
+            <MessageSquare className="h-3.5 w-3.5" />
+            WhatsApp
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Notifications List */}
-      {loading ? (
-        <div className="text-center py-8 text-sm sm:text-base">Cargando notificaciones...</div>
-      ) : filteredNotifications.length === 0 ? (
-        <Card className="p-6 sm:p-8 text-center">
-          <Bell className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-base sm:text-lg font-semibold mb-2">No hay notificaciones</h3>
-          <p className="text-muted-foreground text-sm sm:text-base">
-            Las notificaciones aparecerán aquí
-          </p>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {filteredNotifications.map((notification) => (
-            <Card 
-              key={notification.id} 
-              className={cn(
-                "p-3 sm:p-4 transition-colors",
-                !notification.read && "bg-primary/5 border-primary/20"
-              )}
-            >
-              <div className="flex items-start gap-3 sm:gap-4">
-                <div className={cn(
-                  "p-1.5 sm:p-2 rounded-lg shrink-0",
-                  notification.read ? "bg-muted" : "bg-primary/10"
-                )}>
-                  {getChannelIcon(notification.channel)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h3 className={cn(
-                      "font-medium text-sm sm:text-base",
-                      !notification.read && "text-foreground"
-                    )}>
-                      {notification.title}
-                    </h3>
-                    {getTypeBadge(notification.type)}
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
-                    {notification.message}
-                  </p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
-                    {formatDate(notification.created_at)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
-                  {!notification.read && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => handleMarkAsRead(notification.id)}
-                      title="Marcar como leído"
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteNotification(notification.id)}
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+        <TabsContent value="alertas" className="mt-4 space-y-4">
+          {/* Actions */}
+          {unreadCount > 0 && (
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={handleMarkAllAsRead} className="w-full sm:w-auto">
+                <Check className="h-4 w-4 mr-2" />
+                Marcar todo como leído
+              </Button>
+            </div>
+          )}
+
+          {/* Filters */}
+          <Card className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <div className="flex gap-2 flex-1">
+                <Select value={filterChannel} onValueChange={setFilterChannel}>
+                  <SelectTrigger className="flex-1 sm:w-40 sm:flex-none">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Canal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los canales</SelectItem>
+                    <SelectItem value="system">Sistema</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterRead} onValueChange={setFilterRead}>
+                  <SelectTrigger className="flex-1 sm:w-36 sm:flex-none">
+                    <SelectValue placeholder="Estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="unread">Sin leer</SelectItem>
+                    <SelectItem value="read">Leídas</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
+          </Card>
+
+          {/* Notifications List */}
+          {loading ? (
+            <div className="text-center py-8 text-sm sm:text-base">Cargando notificaciones...</div>
+          ) : filteredNotifications.length === 0 ? (
+            <Card className="p-6 sm:p-8 text-center">
+              <Bell className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">No hay notificaciones</h3>
+              <p className="text-muted-foreground text-sm sm:text-base">
+                Las notificaciones aparecerán aquí
+              </p>
             </Card>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="space-y-3">
+              {filteredNotifications.map((notification) => (
+                <Card
+                  key={notification.id}
+                  className={cn(
+                    "p-3 sm:p-4 transition-colors",
+                    !notification.read && "bg-primary/5 border-primary/20"
+                  )}
+                >
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className={cn(
+                      "p-1.5 sm:p-2 rounded-lg shrink-0",
+                      notification.read ? "bg-muted" : "bg-primary/10"
+                    )}>
+                      {getChannelIcon(notification.channel)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <h3 className={cn(
+                          "font-medium text-sm sm:text-base",
+                          !notification.read && "text-foreground"
+                        )}>
+                          {notification.title}
+                        </h3>
+                        {getTypeBadge(notification.type)}
+                      </div>
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
+                        {notification.message}
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
+                        {formatDate(notification.created_at)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+                      {!notification.read && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleMarkAsRead(notification.id)}
+                          title="Marcar como leído"
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteNotification(notification.id)}
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="whatsapp" className="mt-4">
+          <WhatsAppSection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
