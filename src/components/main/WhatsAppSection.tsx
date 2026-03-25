@@ -156,14 +156,13 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [cRes, aRes] = await Promise.all([
+      const [cRes, aRes] = await Promise.allSettled([
         fetchAPI<{ canales: Canal[] }>("/whatsapp/canales"),
         fetchAPI<{ agentes: Agente[] }>("/whatsapp/agentes"),
       ]);
-      setCanales(cRes.canales ?? []);
-      setAgentes(aRes.agentes ?? []);
-    } catch { toast({ title: "Error cargando canales", variant: "destructive" }); }
-    finally { setLoading(false); }
+      if (cRes.status === "fulfilled") setCanales(cRes.value.canales ?? []);
+      if (aRes.status === "fulfilled") setAgentes(aRes.value.agentes ?? []);
+    } finally { setLoading(false); }
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -553,7 +552,7 @@ function AgentesTab({ isAdmin }: { isAdmin: boolean }) {
     try {
       const res = await fetchAPI<{ agentes: Agente[] }>("/whatsapp/agentes");
       setAgentes(res.agentes ?? []);
-    } catch { toast({ title: "Error cargando agentes", variant: "destructive" }); }
+    } catch { /* sin datos aún — mostrar estado vacío */ }
     finally { setLoading(false); }
   };
 
@@ -880,7 +879,7 @@ function ConversacionesTab() {
     try {
       const res = await fetchAPI<{ conversaciones: Conversacion[] }>("/whatsapp/conversaciones?limit=50&offset=0");
       setConvs(res.conversaciones ?? []);
-    } catch { toast({ title: "Error cargando conversaciones", variant: "destructive" }); }
+    } catch { /* sin datos aún — mostrar estado vacío */ }
     finally { setLoading(false); }
   };
 
