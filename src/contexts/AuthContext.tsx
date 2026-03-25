@@ -95,7 +95,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       } catch (error) {
         console.error('Error refreshing token:', error);
       }
-    }, 10 * 60 * 1000); // 10 minutos
+    }, 4 * 60 * 1000); // 4 minutos (renovar antes de que expire)
 
     return () => clearInterval(interval);
   }, [isAuthenticated]);

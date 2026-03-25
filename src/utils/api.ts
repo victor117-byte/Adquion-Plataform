@@ -106,6 +106,37 @@ export async function fetchAPI<T = unknown>(
     credentials: 'include', // Importante: envía cookies httpOnly
   });
 
+  // 401 → intentar refresh y reintentar una vez
+  // Excepción: los endpoints de auth no deben hacer redirect en 401
+  if (response.status === 401 && !endpoint.startsWith('/auth/')) {
+    if (!isRefreshing) {
+      try {
+        await refreshToken();
+        const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
+          ...options,
+          headers,
+          credentials: 'include',
+        });
+        if (retryResponse.status === 401) {
+          window.location.href = '/auth';
+          throw new Error('Sesión expirada');
+        }
+        const retryData = await retryResponse.json();
+        if (!retryResponse.ok) {
+          throw new Error(retryData.error || retryData.message || 'Error en la petición');
+        }
+        return retryData;
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Sesión expirada') throw err;
+        window.location.href = '/auth';
+        throw new Error('Sesión expirada');
+      }
+    } else {
+      window.location.href = '/auth';
+      throw new Error('Sesión expirada');
+    }
+  }
+
   const data = await response.json();
 
   // Manejar error 403 - puede ser límite excedido o sin acceso
@@ -186,6 +217,7 @@ export async function postFormData<T = unknown>(url: string, formData: FormData)
 // ==================== TOKEN REFRESH ====================
 
 let refreshPromise: Promise<void> | null = null;
+let isRefreshing = false;
 
 /**
  * Refresca el token de acceso usando el refresh token
@@ -194,32 +226,85 @@ let refreshPromise: Promise<void> | null = null;
 export async function refreshToken(): Promise<void> {
   if (refreshPromise) return refreshPromise;
 
+  isRefreshing = true;
   refreshPromise = fetchAPI('/auth/refresh', { method: 'POST' })
     .then(() => {})
     .finally(() => {
       refreshPromise = null;
+      isRefreshing = false;
     });
 
   return refreshPromise;
 }
 
 /**
- * Fetch con reintento automático si el token expiró
+ * Fetch con reintento automático si el token expiró (401)
+ * Si el refresh también falla, redirige al login
  */
 export async function fetchWithRefresh<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  try {
-    return await fetchAPI<T>(endpoint, options);
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : '';
-    if (errorMessage.includes('Token inválido') || errorMessage.includes('expirado')) {
+  const headers = {
+    ...getHeaders(!(options.body instanceof FormData)),
+    ...options.headers,
+  };
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
+
+  // Primer intento de refresh ante 401
+  if (response.status === 401 && !isRefreshing) {
+    try {
       await refreshToken();
-      return await fetchAPI<T>(endpoint, options);
+      // Reintentar la petición original con el nuevo token
+      const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
+      if (!retryResponse.ok) {
+        // Refresh no ayudó → sesión expirada
+        window.location.href = '/auth';
+        throw new Error('Sesión expirada');
+      }
+      return retryResponse.json();
+    } catch {
+      window.location.href = '/auth';
+      throw new Error('Sesión expirada');
     }
-    throw error;
   }
+
+  if (response.status === 401) {
+    window.location.href = '/auth';
+    throw new Error('Sesión expirada');
+  }
+
+  const data = await response.json();
+
+  if (response.status === 403) {
+    if (data.upgradeRequired) {
+      const limitError: LimitExceededError = {
+        message: data.message || data.error || 'Has alcanzado el límite de tu plan',
+        upgradeRequired: true,
+        current: data.current ?? 0,
+        limit: data.limit ?? 0,
+        resource: data.resource,
+      };
+      notifyLimitExceeded(limitError);
+      throw new ApiLimitExceededError(limitError);
+    }
+    throw new Error(data.message || 'No tienes acceso a este recurso');
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || data.message || 'Error en la petición');
+  }
+
+  return data;
 }
 
 // ==================== API URL EXPORT ====================
