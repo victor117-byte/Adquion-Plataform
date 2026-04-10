@@ -439,7 +439,8 @@ export default function Main() {
         "pt-16 md:pt-0",
         sidebarCollapsed ? "md:ml-16" : "md:ml-64"
       )}>
-        <div className="p-4 md:p-6 lg:p-8">
+        {/* key=currentDatabase: fuerza remount de secciones al cambiar organización */}
+        <div key={currentDatabase} className="p-4 md:p-6 lg:p-8">
           {renderSection()}
         </div>
       </main>

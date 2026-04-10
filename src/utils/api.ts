@@ -6,11 +6,10 @@
  */
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-const IS_DEV = import.meta.env.DEV;
 
 const handleAuthError = () => {
   if (typeof window !== 'undefined' && !['/auth', '/'].includes(window.location.pathname)) {
-    window.location.href = '/auth';
+    window.dispatchEvent(new CustomEvent('auth:session-expired'));
   }
 };
 
@@ -133,6 +132,30 @@ export async function fetchAPI<T = unknown>(
         throw new Error('Sesión expirada');
       }
     } else {
+      // Hay un refresh en vuelo — esperarlo y reintentar en lugar de redirigir de inmediato
+      if (refreshPromise) {
+        try {
+          await refreshPromise;
+          const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
+            ...options,
+            headers,
+            credentials: 'include',
+          });
+          if (retryResponse.status === 401) {
+            handleAuthError();
+            throw new Error('Sesión expirada');
+          }
+          const retryData = await retryResponse.json();
+          if (!retryResponse.ok) {
+            throw new Error(retryData.error || retryData.message || 'Error en la petición');
+          }
+          return retryData;
+        } catch (err) {
+          if (err instanceof Error && err.message === 'Sesión expirada') throw err;
+          handleAuthError();
+          throw new Error('Sesión expirada');
+        }
+      }
       handleAuthError();
       throw new Error('Sesión expirada');
     }

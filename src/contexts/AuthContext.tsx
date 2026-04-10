@@ -84,6 +84,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     checkSession();
   }, [checkSession]);
 
+  // Escuchar evento de sesión expirada emitido por fetchAPI
+  useEffect(() => {
+    const handler = () => {
+      setUser(null);
+      navigate('/auth');
+    };
+    window.addEventListener('auth:session-expired', handler);
+    return () => window.removeEventListener('auth:session-expired', handler);
+  }, [navigate]);
+
   // Configurar refresh automático cada 10 minutos
   const isAuthenticated = !!user;
   useEffect(() => {
@@ -224,9 +234,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           title: 'Organización cambiada',
           description: `Ahora estás en ${response.data.organizacionActiva.nombre}`,
         });
-
-        // Recargar la página para aplicar el cambio de contexto
-        window.location.reload();
       }
     } catch (error) {
       console.error('Error cambiando organización:', error);
