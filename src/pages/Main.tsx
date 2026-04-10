@@ -203,7 +203,7 @@ export default function Main() {
     checkReportes();
   }, [currentDatabase]);
 
-  if (loading || checkingReportes || subLoading) {
+  if (loading || subLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -280,9 +280,9 @@ export default function Main() {
       <aside
         className={cn(
           "fixed left-0 top-0 h-full border-r border-border bg-card transition-all duration-300 z-50",
-          "hidden md:block",
           sidebarCollapsed ? "md:w-16" : "md:w-64",
-          mobileMenuOpen ? "block w-64" : "hidden"
+          // En mobile: visible si el menú está abierto, oculto si no (md: siempre visible)
+          mobileMenuOpen ? "block w-64" : "hidden md:block"
         )}
       >
         {/* Logo */}

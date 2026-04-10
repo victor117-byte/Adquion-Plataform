@@ -517,7 +517,8 @@ function ScheduleConfigurator({
       const newCron = generateCronFromSchedule(mode, { hour, minute, interval, weekdays });
       onChange(newCron);
     }
-  }, [mode, hour, minute, interval, weekdays, customCron, onChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, hour, minute, interval, weekdays, customCron]);
 
   return (
     <div className="space-y-4">

@@ -253,11 +253,18 @@ const MIN_COL_WIDTH = 60;
 
 function useResizableColumns(defaults: Record<string, number>) {
   const [widths, setWidths] = useState(defaults);
+  // Ref para leer siempre el ancho actual sin causar stale closures en el handler de drag
+  const widthsRef = useRef(widths);
   const dragging = useRef<{ col: string; startX: number; startW: number } | null>(null);
+
+  useEffect(() => {
+    widthsRef.current = widths;
+  }, [widths]);
 
   const onMouseDown = useCallback((col: string, e: React.MouseEvent) => {
     e.preventDefault();
-    dragging.current = { col, startX: e.clientX, startW: widths[col] };
+    // Leemos el ancho actual desde el ref → nunca obsoleto
+    dragging.current = { col, startX: e.clientX, startW: widthsRef.current[col] };
 
     const onMouseMove = (ev: MouseEvent) => {
       if (!dragging.current) return;
@@ -276,7 +283,8 @@ function useResizableColumns(defaults: Record<string, number>) {
     document.addEventListener("mouseup", onMouseUp);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
-  }, [widths]);
+  // El callback ya no depende de widths gracias al ref
+  }, []);
 
   return { widths, onMouseDown };
 }
@@ -314,6 +322,42 @@ function buildPdfLookup(d: Declaracion, tipo: "declaracion" | "pago" = "declarac
     ejercicio: d.ejercicio,
     periodo_de_declaracion: d.periodo_de_declaracion,
   };
+}
+
+// ==================== ResizableHeader ====================
+// Definido fuera del componente para evitar re-montajes en cada render
+
+interface ResizableHeaderProps {
+  col: string;
+  field?: string;
+  children: React.ReactNode;
+  className?: string;
+  colW: Record<string, number>;
+  sortBy: string | undefined;
+  onMouseDown: (col: string, e: React.MouseEvent) => void;
+  onSort: (field: string) => void;
+}
+
+function ResizableHeader({ col, field, children, className = "", colW, sortBy, onMouseDown, onSort }: ResizableHeaderProps) {
+  return (
+    <TableHead
+      className={`relative select-none ${field ? "cursor-pointer hover:text-foreground" : ""} ${className}`}
+      style={{ width: colW[col], minWidth: MIN_COL_WIDTH }}
+      onClick={field ? () => onSort(field) : undefined}
+    >
+      <div className="flex items-center gap-1 pr-3">
+        {children}
+        {field && <ArrowUpDown className={`h-3 w-3 shrink-0 ${sortBy === field ? "text-primary" : "text-muted-foreground/50"}`} />}
+      </div>
+      {/* Resize handle */}
+      <div
+        className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center hover:bg-muted/50 z-10"
+        onMouseDown={(e) => { e.stopPropagation(); onMouseDown(col, e); }}
+      >
+        <GripVertical className="h-3 w-3 text-muted-foreground/30" />
+      </div>
+    </TableHead>
+  );
 }
 
 // ==================== Main Component ====================
@@ -394,7 +438,9 @@ export function Dashboard2Section() {
     link.href = url;
     link.download = filename;
     link.click();
-    URL.revokeObjectURL(url);
+    // Diferimos la revocación para que el navegador complete la descarga
+    // (necesario en Safari/iOS donde el click sintético es asíncrono)
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   }, []);
 
   // Resizable columns
@@ -468,31 +514,6 @@ export function Dashboard2Section() {
     );
   }
 
-  // ---- Resizable header helper ----
-  const ResizableHeader = ({ col, field, children, className = "" }: {
-    col: string;
-    field?: string;
-    children: React.ReactNode;
-    className?: string;
-  }) => (
-    <TableHead
-      className={`relative select-none ${field ? "cursor-pointer hover:text-foreground" : ""} ${className}`}
-      style={{ width: colW[col], minWidth: MIN_COL_WIDTH }}
-      onClick={field ? () => handleSort(field) : undefined}
-    >
-      <div className="flex items-center gap-1 pr-3">
-        {children}
-        {field && <ArrowUpDown className={`h-3 w-3 shrink-0 ${sortBy === field ? "text-primary" : "text-muted-foreground/50"}`} />}
-      </div>
-      {/* Resize handle */}
-      <div
-        className="absolute right-0 top-0 bottom-0 w-3 cursor-col-resize flex items-center justify-center hover:bg-muted/50 z-10"
-        onMouseDown={(e) => { e.stopPropagation(); onMouseDown(col, e); }}
-      >
-        <GripVertical className="h-3 w-3 text-muted-foreground/30" />
-      </div>
-    </TableHead>
-  );
 
   const renderRow = (d: Declaracion, index: number) => {
     const impFavor = Number(d.impuesto_a_favor) || 0;
@@ -792,15 +813,15 @@ export function Dashboard2Section() {
               <Table className="table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <ResizableHeader col="razon_social" field="razon_social">Razón Social</ResizableHeader>
-                    <ResizableHeader col="rfc" field="rfc">RFC</ResizableHeader>
-                    <ResizableHeader col="linea_de_captura" field="linea_de_captura">Línea de Captura</ResizableHeader>
-                    <ResizableHeader col="fecha_y_hora_presentacion" field="fecha_y_hora_presentacion">Presentación</ResizableHeader>
-                    <ResizableHeader col="vigente_hasta" field="vigente_hasta">Vigencia</ResizableHeader>
-                    <ResizableHeader col="fecha_de_pago" field="fecha_de_pago">Fecha Pago</ResizableHeader>
-                    <ResizableHeader col="impuesto_a_favor" className="text-right">Imp. a Favor</ResizableHeader>
-                    <ResizableHeader col="total_a_pagar_unico" field="total_a_pagar_unico" className="text-right">Total a Pagar</ResizableHeader>
-                    <ResizableHeader col="estatus_pago" field="estatus_pago" className="text-center">Estado</ResizableHeader>
+                    <ResizableHeader col="razon_social" field="razon_social" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>Razón Social</ResizableHeader>
+                    <ResizableHeader col="rfc" field="rfc" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>RFC</ResizableHeader>
+                    <ResizableHeader col="linea_de_captura" field="linea_de_captura" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>Línea de Captura</ResizableHeader>
+                    <ResizableHeader col="fecha_y_hora_presentacion" field="fecha_y_hora_presentacion" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>Presentación</ResizableHeader>
+                    <ResizableHeader col="vigente_hasta" field="vigente_hasta" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>Vigencia</ResizableHeader>
+                    <ResizableHeader col="fecha_de_pago" field="fecha_de_pago" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>Fecha Pago</ResizableHeader>
+                    <ResizableHeader col="impuesto_a_favor" className="text-right" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>Imp. a Favor</ResizableHeader>
+                    <ResizableHeader col="total_a_pagar_unico" field="total_a_pagar_unico" className="text-right" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>Total a Pagar</ResizableHeader>
+                    <ResizableHeader col="estatus_pago" field="estatus_pago" className="text-center" colW={colW} sortBy={sortBy} onMouseDown={onMouseDown} onSort={handleSort}>Estado</ResizableHeader>
                     <TableHead className="text-center" style={{ width: colW.acciones, minWidth: MIN_COL_WIDTH }}>Ver</TableHead>
                   </TableRow>
                 </TableHeader>

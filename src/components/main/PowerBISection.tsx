@@ -593,12 +593,11 @@ export function PowerBISection() {
               </div>
             </div>
             
-            <div className="relative w-full border rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 300px)' }}>
+            <div className="relative w-full border rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 300px)', minHeight: '400px' }}>
               <iframe
                 title={reporteActivo.titulo}
                 src={reporteActivo.url_embed}
-                className="w-full h-full"
-                frameBorder="0"
+                className="w-full h-full border-0"
                 allowFullScreen
               />
             </div>

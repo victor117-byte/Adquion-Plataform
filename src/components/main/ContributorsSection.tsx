@@ -186,6 +186,66 @@ function CertificadoBadge({ estado }: { estado: CertificadoEstado }) {
   );
 }
 
+// ==================== FileUploadItem ====================
+// Definido fuera de CertificadoUploader para evitar re-montajes en cada render del padre
+
+interface FileUploadItemProps {
+  label: string;
+  accept: string;
+  file: File | null;
+  inputRef: React.RefObject<HTMLInputElement>;
+  onFileChange: (file: File | null) => void;
+  icon: React.ComponentType<{ className?: string }>;
+  iconColor: string;
+}
+
+function FileUploadItem({ label, accept, file, inputRef, onFileChange, icon: IconComponent, iconColor }: FileUploadItemProps) {
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+      <div className={`p-2 rounded-lg ${iconColor}`}>
+        <IconComponent className="h-5 w-5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        {file ? (
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-green-600 dark:text-green-400 truncate">
+              {file.name}
+            </span>
+            <button
+              onClick={() => {
+                onFileChange(null);
+                if (inputRef.current) inputRef.current.value = '';
+              }}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Sin archivo</p>
+        )}
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => inputRef.current?.click()}
+        className="shrink-0"
+      >
+        <Upload className="h-4 w-4 mr-1" />
+        Elegir
+      </Button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        onChange={(e) => onFileChange(e.target.files?.[0] || null)}
+        className="hidden"
+      />
+    </div>
+  );
+}
+
 // Componente para subir certificados (ahora con soporte .pem)
 function CertificadoUploader({
   contribuyenteId,
@@ -261,66 +321,6 @@ function CertificadoUploader({
     }
   };
 
-  const FileUploadItem = ({
-    label,
-    accept,
-    file,
-    inputRef,
-    onFileChange,
-    icon: IconComponent,
-    iconColor
-  }: {
-    label: string;
-    accept: string;
-    file: File | null;
-    inputRef: React.RefObject<HTMLInputElement>;
-    onFileChange: (file: File | null) => void;
-    icon: typeof FileText;
-    iconColor: string;
-  }) => (
-    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
-      <div className={`p-2 rounded-lg ${iconColor}`}>
-        <IconComponent className="h-5 w-5" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">{label}</p>
-        {file ? (
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-green-600 dark:text-green-400 truncate">
-              {file.name}
-            </span>
-            <button
-              onClick={() => {
-                onFileChange(null);
-                if (inputRef.current) inputRef.current.value = '';
-              }}
-              className="text-muted-foreground hover:text-destructive"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">Sin archivo</p>
-        )}
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => inputRef.current?.click()}
-        className="shrink-0"
-      >
-        <Upload className="h-4 w-4 mr-1" />
-        Elegir
-      </Button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        onChange={(e) => onFileChange(e.target.files?.[0] || null)}
-        className="hidden"
-      />
-    </div>
-  );
 
   return (
     <div className="space-y-4">

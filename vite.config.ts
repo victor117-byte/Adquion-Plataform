@@ -2,36 +2,29 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 
-const NGROK_BACKEND = 'https://adquion-backend.ngrok.io';
-const NGROK_HEADERS = { 'ngrok-skip-browser-warning': 'true' };
-
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   base: '/',
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ['.ngrok.io'],
     proxy: {
       '/api': {
-        target: mode === 'test' ? NGROK_BACKEND : 'http://localhost:3000',
+        target: 'https://api.adquion.com',
         changeOrigin: true,
-        secure: false,
-        headers: mode === 'test' ? NGROK_HEADERS : {},
+        secure: true,
       }
     }
   },
-  // Preview server: sirve el build de producción con proxy hacia ngrok
+  // Preview server
   preview: {
     host: "::",
     port: 4173,
-    allowedHosts: ['.ngrok.io'],
     proxy: {
       '/api': {
-        target: NGROK_BACKEND,
+        target: 'https://api.adquion.com',
         changeOrigin: true,
-        secure: false,
-        headers: NGROK_HEADERS,
+        secure: true,
       }
     }
   },

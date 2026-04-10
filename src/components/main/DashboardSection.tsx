@@ -1,5 +1,6 @@
 import { FileText, Users, Upload, TrendingUp, Clock, CheckCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { PlanLimitsCard } from "./PlanLimitsCard";
 import { useSubscription } from "@/hooks/use-subscription";
 
@@ -73,7 +74,12 @@ export function DashboardSection() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
+            <Badge variant="outline" className="bg-amber-100/50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800">
+              Datos de Demostración
+            </Badge>
+          </div>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Resumen general de tu cuenta
           </p>

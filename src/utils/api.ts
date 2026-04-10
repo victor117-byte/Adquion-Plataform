@@ -8,6 +8,12 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 const IS_DEV = import.meta.env.DEV;
 
+const handleAuthError = () => {
+  if (typeof window !== 'undefined' && !['/auth', '/'].includes(window.location.pathname)) {
+    window.location.href = '/auth';
+  }
+};
+
 // ==================== TIPOS DE ERROR ====================
 
 export interface LimitExceededError {
@@ -69,11 +75,6 @@ function notifyLimitExceeded(error: LimitExceededError): void {
 export function getHeaders(includeContentType: boolean = true): Record<string, string> {
   const headers: Record<string, string> = {};
 
-  // Incluir ngrok header siempre que el backend sea ngrok (dev o prod)
-  if (API_BASE.includes('ngrok') || !import.meta.env.PROD) {
-    headers['ngrok-skip-browser-warning'] = 'true';
-  }
-
   if (includeContentType) {
     headers['Content-Type'] = 'application/json';
   }
@@ -118,7 +119,7 @@ export async function fetchAPI<T = unknown>(
           credentials: 'include',
         });
         if (retryResponse.status === 401) {
-          window.location.href = '/auth';
+          handleAuthError();
           throw new Error('Sesión expirada');
         }
         const retryData = await retryResponse.json();
@@ -128,11 +129,11 @@ export async function fetchAPI<T = unknown>(
         return retryData;
       } catch (err) {
         if (err instanceof Error && err.message === 'Sesión expirada') throw err;
-        window.location.href = '/auth';
+        handleAuthError();
         throw new Error('Sesión expirada');
       }
     } else {
-      window.location.href = '/auth';
+      handleAuthError();
       throw new Error('Sesión expirada');
     }
   }
@@ -268,18 +269,18 @@ export async function fetchWithRefresh<T = unknown>(
       });
       if (!retryResponse.ok) {
         // Refresh no ayudó → sesión expirada
-        window.location.href = '/auth';
+        handleAuthError();
         throw new Error('Sesión expirada');
       }
       return retryResponse.json();
     } catch {
-      window.location.href = '/auth';
+      handleAuthError();
       throw new Error('Sesión expirada');
     }
   }
 
   if (response.status === 401) {
-    window.location.href = '/auth';
+    handleAuthError();
     throw new Error('Sesión expirada');
   }
 

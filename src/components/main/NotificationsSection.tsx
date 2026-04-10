@@ -25,12 +25,10 @@ interface Notification {
   created_at: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const getHeaders = () => ({
   'Content-Type': 'application/json',
-  'ngrok-skip-browser-warning': 'true',
-  'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
 });
 
 export function NotificationsSection() {
@@ -47,6 +45,7 @@ export function NotificationsSection() {
     try {
       const response = await fetch(`${API_URL}/notifications`, {
         headers: getHeaders(),
+        credentials: 'include',
       });
       if (response.ok) {
         const data = await response.json();
@@ -64,6 +63,7 @@ export function NotificationsSection() {
       const response = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
         method: 'PATCH',
         headers: getHeaders(),
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -81,6 +81,7 @@ export function NotificationsSection() {
       const response = await fetch(`${API_URL}/notifications/read-all`, {
         method: 'PATCH',
         headers: getHeaders(),
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -101,6 +102,7 @@ export function NotificationsSection() {
       const response = await fetch(`${API_URL}/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: getHeaders(),
+        credentials: 'include',
       });
 
       if (response.ok) {
