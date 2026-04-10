@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { get, post } from '@/utils/api';
+import { get, post, ApiLimitExceededError } from '@/utils/api';
 import { toast } from '@/hooks/use-toast';
 
 // ==================== TIPOS ====================
@@ -92,16 +92,22 @@ export function useSubscription() {
     setError(null);
 
     try {
-      const [subRes, plansRes] = await Promise.all([
+      const [subRes, plansRes] = await Promise.allSettled([
         get<SubscriptionResponse>('/stripe/subscription'),
         get<PlansResponse>('/stripe/plans'),
       ]);
 
-      if (subRes.success) {
-        setSubscription(subRes.data);
+      if (subRes.status === 'fulfilled' && subRes.value.success) {
+        setSubscription(subRes.value.data);
       }
-      if (plansRes.success) {
-        setPlans(plansRes.data.plans);
+      // Un 401 en /stripe/subscription significa que el usuario no tiene suscripción
+      // (plan gratuito). No es un error de sesión — se mantiene subscription=null (isFree=true).
+      if (subRes.status === 'rejected' && !(subRes.reason instanceof ApiLimitExceededError)) {
+        console.warn('Suscripción no disponible, usando plan gratuito:', subRes.reason?.message);
+      }
+
+      if (plansRes.status === 'fulfilled' && plansRes.value.success) {
+        setPlans(plansRes.value.data.plans);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error cargando datos de suscripción';

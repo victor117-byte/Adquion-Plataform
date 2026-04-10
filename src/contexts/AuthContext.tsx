@@ -84,9 +84,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     checkSession();
   }, [checkSession]);
 
-  // Escuchar evento de sesión expirada emitido por fetchAPI
+  // Escuchar evento de sesión expirada emitido por fetchAPI.
+  // Antes de cerrar sesión, verificamos con /auth/me porque un 401 en endpoints
+  // como /stripe/subscription no necesariamente significa sesión expirada.
   useEffect(() => {
-    const handler = () => {
+    const handler = async () => {
+      try {
+        const response = await fetchAPI<{ success: boolean; data: User }>('/auth/me');
+        if (response.success && response.data) {
+          // Sesión todavía válida — el 401 vino de otro endpoint, no de auth
+          setUser(response.data);
+          return;
+        }
+      } catch {
+        // /auth/me falló: sesión realmente expirada
+      }
       setUser(null);
       navigate('/auth');
     };
