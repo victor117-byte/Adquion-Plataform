@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Rocket,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -215,6 +216,18 @@ export function SubscriptionSection() {
         <>
           <Separator />
 
+          {/* Banner de lanzamiento */}
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/10 border border-primary/20">
+            <Rocket className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-primary">Lanzamiento gratuito</p>
+              <p className="text-sm text-primary/80 mt-0.5">
+                Todos los planes están disponibles de forma gratuita durante el periodo de lanzamiento.
+                Los precios reales se activarán próximamente y se comunicarán con anticipación.
+              </p>
+            </div>
+          </div>
+
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {plans.map((plan) => (
               <PlanCard
@@ -229,7 +242,7 @@ export function SubscriptionSection() {
 
           {/* Notas */}
           <div className="text-center text-sm text-muted-foreground space-y-1">
-            <p>Todos los precios están en MXN e incluyen IVA.</p>
+            <p>Precios en MXN. Sin tarjeta de crédito requerida durante el lanzamiento.</p>
             <p>Puedes cancelar tu suscripción en cualquier momento.</p>
           </div>
         </>
@@ -501,7 +514,7 @@ interface PlanCardProps {
 }
 
 function PlanCard({ plan, isProcessing, onUpgrade, icon: Icon }: PlanCardProps) {
-  const isFree = plan.price === 0;
+  const isBasicFree = plan.price === 0;
   const isCurrentPlan = plan.is_current;
 
   return (
@@ -523,10 +536,30 @@ function PlanCard({ plan, isProcessing, onUpgrade, icon: Icon }: PlanCardProps) 
           <Icon className="h-6 w-6 text-primary" />
         </div>
         <CardTitle className="text-xl">{plan.name}</CardTitle>
-        <div className="mt-2">
-          <span className="text-4xl font-bold">${plan.price.toLocaleString('es-MX')}</span>
-          {!isFree && (
-            <span className="text-muted-foreground text-sm ml-1">{plan.currency}/mes</span>
+
+        <div className="mt-2 flex flex-col items-center gap-1">
+          {/* Precio real tachado (solo para planes de pago) */}
+          {!isBasicFree && (
+            <div className="flex items-baseline gap-1 text-muted-foreground">
+              <span className="text-xl line-through">
+                ${plan.price.toLocaleString('es-MX')}
+              </span>
+              <span className="text-sm line-through">{plan.currency}/mes</span>
+            </div>
+          )}
+          {/* Precio de lanzamiento */}
+          <div className="flex items-baseline justify-center gap-1">
+            <span className="text-4xl font-bold text-primary">
+              {isBasicFree ? '$0' : 'Gratis'}
+            </span>
+            {isBasicFree && (
+              <span className="text-muted-foreground text-sm">/mes</span>
+            )}
+          </div>
+          {!isBasicFree && (
+            <Badge variant="outline" className="text-primary border-primary/40 text-xs">
+              Durante el lanzamiento
+            </Badge>
           )}
         </div>
       </CardHeader>
@@ -546,22 +579,17 @@ function PlanCard({ plan, isProcessing, onUpgrade, icon: Icon }: PlanCardProps) 
         <Button
           className="w-full"
           variant={isCurrentPlan ? 'outline' : plan.is_popular ? 'default' : 'outline'}
-          disabled={isCurrentPlan || isFree || isProcessing}
+          disabled={true}
           onClick={onUpgrade}
         >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              Procesando...
-            </>
-          ) : isCurrentPlan ? (
+          {isCurrentPlan ? (
             'Plan actual'
-          ) : isFree ? (
+          ) : isBasicFree ? (
             'Plan gratuito'
           ) : (
             <>
-              Actualizar
-              <ExternalLink className="h-4 w-4 ml-2" />
+              <Rocket className="h-4 w-4 mr-2" />
+              Próximamente
             </>
           )}
         </Button>
