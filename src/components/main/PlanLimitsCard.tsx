@@ -56,6 +56,12 @@ export function PlanLimitsCard({ onUpgradeClick, showAlways = false }: PlanLimit
     return null;
   }
 
+  const showSaaSAlerts = import.meta.env.VITE_SHOW_SAAS_ALERTS === 'true';
+
+  if (!showSaaSAlerts) {
+    return null;
+  }
+
   const isFree = usage.planId === 'basic_free' || usage.planName.toLowerCase().includes('free');
   const hasAlerts = hasAnyAtLimit() || hasAnyNearLimit();
 

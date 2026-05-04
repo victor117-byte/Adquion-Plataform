@@ -304,6 +304,8 @@ function UsageLimitsSection({ usage, loading }: UsageLimitsSectionProps) {
   const limitedResources = usage.limits.filter((l) => !l.isUnlimited);
   const unlimitedResources = usage.limits.filter((l) => l.isUnlimited);
 
+  const showSaaSAlerts = import.meta.env.VITE_SHOW_SAAS_ALERTS === 'true';
+
   return (
     <div className="space-y-6">
       {/* Header de la sección */}
@@ -315,7 +317,7 @@ function UsageLimitsSection({ usage, loading }: UsageLimitsSectionProps) {
       </div>
 
       {/* Advertencias si hay */}
-      {usage.hasWarnings && usage.warnings.length > 0 && (
+      {showSaaSAlerts && usage.hasWarnings && usage.warnings.length > 0 && (
         <Card className="border-warning/50 bg-warning/10">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">

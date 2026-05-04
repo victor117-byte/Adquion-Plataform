@@ -21,6 +21,8 @@ import {
   ZoomOut,
   RotateCcw,
   GripVertical,
+  Filter,
+  SearchX,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useDashboardDeclaraciones,
@@ -53,6 +56,7 @@ import {
   type FiltrosDeclaraciones,
   type PdfLookupParams,
 } from "@/hooks/use-dashboard-declaraciones";
+import { useDebounce } from "@/hooks/use-debounce";
 import {
   Dialog,
   DialogContent,
@@ -374,20 +378,29 @@ export function Dashboard2Section() {
   const [filterBusqueda, setFilterBusqueda] = useState("");
   const [filterEjercicio, setFilterEjercicio] = useState("all");
   const [selectedContadorId, setSelectedContadorId] = useState<number | undefined>();
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  const debouncedFilterRfc = useDebounce(filterRfc, 500);
+  const debouncedFilterRazonSocial = useDebounce(filterRazonSocial, 500);
+  const debouncedFilterBusqueda = useDebounce(filterBusqueda, 500);
 
   // Paginación
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedFilterRfc, debouncedFilterRazonSocial, debouncedFilterBusqueda]);
 
   // Ordenamiento
   const [sortBy, setSortBy] = useState<string | undefined>();
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const filtros: FiltrosDeclaraciones = {
-    rfc: filterRfc || undefined,
-    razon_social: filterRazonSocial || undefined,
+    rfc: debouncedFilterRfc || undefined,
+    razon_social: debouncedFilterRazonSocial || undefined,
     estatus_pago: filterEstado !== "all" ? filterEstado : undefined,
-    busqueda: filterBusqueda || undefined,
+    busqueda: debouncedFilterBusqueda || undefined,
     ejercicio: filterEjercicio !== "all" ? filterEjercicio : undefined,
   };
 
@@ -445,6 +458,30 @@ export function Dashboard2Section() {
 
   // Resizable columns
   const { widths: colW, onMouseDown } = useResizableColumns(DEFAULT_COL_WIDTHS);
+
+  const handleExportCsv = () => {
+    if (!data || data.length === 0) return;
+    const headers = ["Razón Social", "RFC", "Línea de Captura", "Presentación", "Vigencia", "Fecha de Pago", "Impuesto a Favor", "Total a Pagar", "Estatus"];
+    const rows = data.map(d => [
+      `"${d.razon_social || ''}"`,
+      d.rfc,
+      d.linea_de_captura,
+      d.fecha_y_hora_presentacion,
+      d.vigente_hasta || '',
+      d.fecha_de_pago || '',
+      d.impuesto_a_favor || '0',
+      d.total_a_pagar_unico || '0',
+      d.estatus_pago
+    ]);
+    const csvContent = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: "text/csv;charset=utf-8;" }); // BOM for Excel
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "declaraciones.csv";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+  };
 
   const hasFilters =
     filterRfc || filterRazonSocial || filterEstado !== "all" || filterBusqueda ||
@@ -519,9 +556,13 @@ export function Dashboard2Section() {
     const impFavor = Number(d.impuesto_a_favor) || 0;
     const totalPagar = Number(d.total_a_pagar_unico) || 0;
     const status = statusConfig[d.estatus_pago] || statusConfig.Pendiente;
+    const isVencido = d.estatus_pago === 'Vencido';
 
     return (
-      <TableRow key={`${d.rfc}-${d.linea_de_captura}-${index}`}>
+      <TableRow 
+        key={`${d.rfc}-${d.linea_de_captura}-${index}`}
+        className={isVencido ? "bg-destructive/5 hover:bg-destructive/10 transition-colors" : ""}
+      >
         <TableCell className="font-medium truncate" style={{ maxWidth: colW.razon_social }} title={d.razon_social || ""}>
           {d.razon_social}
         </TableCell>
@@ -570,11 +611,12 @@ export function Dashboard2Section() {
     const impFavor = Number(d.impuesto_a_favor) || 0;
     const totalPagar = Number(d.total_a_pagar_unico) || 0;
     const status = statusConfig[d.estatus_pago] || statusConfig.Pendiente;
+    const isVencido = d.estatus_pago === 'Vencido';
 
     return (
       <Card
         key={`${d.rfc}-${d.linea_de_captura}-${index}`}
-        className="p-4 space-y-3"
+        className={`p-4 space-y-3 transition-colors ${isVencido ? 'bg-destructive/5 border-destructive/20' : ''}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -639,7 +681,7 @@ export function Dashboard2Section() {
       {/* KPIs */}
       {kpis && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="p-3 sm:p-5">
+          <Card className="p-3 sm:p-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 border-primary/10 bg-gradient-to-br from-primary/5 to-transparent">
             <div className="flex items-center justify-between mb-2 sm:mb-3">
               <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Total</h3>
               <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
@@ -649,7 +691,7 @@ export function Dashboard2Section() {
             <p className="text-xl sm:text-2xl font-bold text-foreground">{kpis.total_declaraciones}</p>
             <p className="text-xs sm:text-sm mt-1 text-muted-foreground">Declaraciones</p>
           </Card>
-          <Card className="p-3 sm:p-5">
+          <Card className="p-3 sm:p-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 border-success/10 bg-gradient-to-br from-success/5 to-transparent">
             <div className="flex items-center justify-between mb-2 sm:mb-3">
               <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Pagadas</h3>
               <div className="p-1.5 sm:p-2 bg-success/10 rounded-lg">
@@ -659,10 +701,10 @@ export function Dashboard2Section() {
             <p className="text-xl sm:text-2xl font-bold text-foreground">{kpis.total_pagadas}</p>
             <div className="flex items-center gap-1 mt-1">
               <TrendingUp className="h-3 w-3 text-success" />
-              <p className="text-xs sm:text-sm text-success">{kpis.porcentaje_cumplimiento}% cumplimiento</p>
+              <p className="text-xs sm:text-sm text-success font-medium">{kpis.porcentaje_cumplimiento}% cumplimiento</p>
             </div>
           </Card>
-          <Card className="p-3 sm:p-5">
+          <Card className="p-3 sm:p-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 border-warning/10 bg-gradient-to-br from-warning/5 to-transparent">
             <div className="flex items-center justify-between mb-2 sm:mb-3">
               <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Pendientes</h3>
               <div className="p-1.5 sm:p-2 bg-warning/10 rounded-lg">
@@ -673,14 +715,14 @@ export function Dashboard2Section() {
             {kpis.total_vencidas > 0 && (
               <div className="flex items-center gap-1 mt-1">
                 <AlertTriangle className="h-3 w-3 text-destructive" />
-                <p className="text-xs sm:text-sm text-destructive">{kpis.total_vencidas} vencidas</p>
+                <p className="text-xs sm:text-sm text-destructive font-medium">{kpis.total_vencidas} vencidas</p>
               </div>
             )}
             {kpis.total_vencidas === 0 && (
-              <p className="text-xs sm:text-sm mt-1 text-warning">Por pagar</p>
+              <p className="text-xs sm:text-sm mt-1 text-warning font-medium">Por pagar</p>
             )}
           </Card>
-          <Card className="p-3 sm:p-5">
+          <Card className="p-3 sm:p-5 relative overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 border-primary/10 bg-gradient-to-br from-primary/5 to-transparent">
             <div className="flex items-center justify-between mb-2 sm:mb-3">
               <h3 className="text-xs sm:text-sm font-medium text-muted-foreground">Monto Pendiente</h3>
               <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg">
@@ -697,116 +739,155 @@ export function Dashboard2Section() {
       )}
 
       {/* Filtros */}
-      <Card className="p-4 sm:p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
-          <div className="relative sm:col-span-2 lg:col-span-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Búsqueda general..."
-              value={filterBusqueda}
-              onChange={(e) => handleFilterChange(setFilterBusqueda)(e.target.value)}
-              className="pl-9"
-            />
+      <Card className="p-4 sm:p-6 mb-4 border-primary/5 bg-gradient-to-b from-transparent to-muted/20">
+        <div className="flex flex-col gap-4">
+          {/* Main Filters Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Búsqueda general..."
+                value={filterBusqueda}
+                onChange={(e) => setFilterBusqueda(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrar por RFC..."
+                value={filterRfc}
+                onChange={(e) => setFilterRfc(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrar por Razón Social..."
+                value={filterRazonSocial}
+                onChange={(e) => setFilterRazonSocial(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showAdvancedFilters ? "secondary" : "outline"}
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="flex-1 justify-center gap-2"
+              >
+                <Filter className="h-4 w-4" />
+                Avanzados
+              </Button>
+              <Button variant="outline" onClick={handleExportCsv} className="shrink-0 gap-2" title="Exportar a CSV">
+                <Download className="h-4 w-4" />
+                Exportar
+              </Button>
+            </div>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Filtrar por RFC..."
-              value={filterRfc}
-              onChange={(e) => handleFilterChange(setFilterRfc)(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Filtrar por Razón Social..."
-              value={filterRazonSocial}
-              onChange={(e) => handleFilterChange(setFilterRazonSocial)(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={filterEstado} onValueChange={(v) => { setFilterEstado(v); setPage(1); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="Pagado">Pagado</SelectItem>
-              <SelectItem value="Pendiente">Pendiente</SelectItem>
-              <SelectItem value="Vencido">Vencido</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterEjercicio} onValueChange={(v) => { setFilterEjercicio(v); setPage(1); }}>
-            <SelectTrigger>
-              <SelectValue placeholder="Año fiscal" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los años</SelectItem>
-              {ejercicios.map((ej) => (
-                <SelectItem key={ej} value={ej}>{ej}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {isAdmin && usuarios.length > 0 && (
-            <Select
-              value={selectedContadorId !== undefined ? String(selectedContadorId) : "all"}
-              onValueChange={(v) => handleContadorChange(v === "all" ? undefined : Number(v))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Ver como..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los usuarios</SelectItem>
-                {(() => {
-                  const admins = usuarios.filter(u => u.tipo_usuario === "administrador");
-                  const contadores = usuarios.filter(u => u.tipo_usuario === "contador");
-                  return (
-                    <>
-                      {admins.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>Administradores</SelectLabel>
-                          {admins.map(u => (
-                            <SelectItem key={u.id} value={String(u.id)}>
-                              {u.nombre} ({u.total_contribuyentes})
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      )}
-                      {contadores.length > 0 && (
-                        <SelectGroup>
-                          <SelectLabel>Contadores</SelectLabel>
-                          {contadores.map(u => (
-                            <SelectItem key={u.id} value={String(u.id)}>
-                              {u.nombre} ({u.total_contribuyentes})
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      )}
-                    </>
-                  );
-                })()}
-              </SelectContent>
-            </Select>
-          )}
-          {hasFilters && (
-            <Button variant="outline" onClick={clearFilters} className="gap-2">
-              <X className="h-4 w-4" />
-              Limpiar
-            </Button>
+
+          {/* Advanced Filters */}
+          {showAdvancedFilters && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 pt-4 border-t border-border/50 animate-in fade-in slide-in-from-top-2">
+              <Select value={filterEstado} onValueChange={(v) => { setFilterEstado(v); setPage(1); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="Pagado">Pagado</SelectItem>
+                  <SelectItem value="Pendiente">Pendiente</SelectItem>
+                  <SelectItem value="Vencido">Vencido</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filterEjercicio} onValueChange={(v) => { setFilterEjercicio(v); setPage(1); }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Año fiscal" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los años</SelectItem>
+                  {ejercicios.map((ej) => (
+                    <SelectItem key={ej} value={ej}>{ej}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isAdmin && usuarios.length > 0 && (
+                <Select
+                  value={selectedContadorId !== undefined ? String(selectedContadorId) : "all"}
+                  onValueChange={(v) => handleContadorChange(v === "all" ? undefined : Number(v))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ver como..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los usuarios</SelectItem>
+                    {(() => {
+                      const admins = usuarios.filter(u => u.tipo_usuario === "administrador");
+                      const contadores = usuarios.filter(u => u.tipo_usuario === "contador");
+                      return (
+                        <>
+                          {admins.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Administradores</SelectLabel>
+                              {admins.map(u => (
+                                <SelectItem key={u.id} value={String(u.id)}>
+                                  {u.nombre} ({u.total_contribuyentes})
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          )}
+                          {contadores.length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Contadores</SelectLabel>
+                              {contadores.map(u => (
+                                <SelectItem key={u.id} value={String(u.id)}>
+                                  {u.nombre} ({u.total_contribuyentes})
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </SelectContent>
+                </Select>
+              )}
+              {hasFilters && (
+                <div className="flex items-center">
+                  <Button variant="ghost" onClick={clearFilters} className="gap-2 text-muted-foreground hover:text-foreground">
+                    <X className="h-4 w-4" />
+                    Limpiar filtros
+                  </Button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </Card>
 
-      {/* Loading */}
-      {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      )}
-
-      {/* Tabla desktop */}
-      {!loading && (
+      {/* Tabla y Skeletons */}
+      {loading ? (
+        <Card className="overflow-hidden">
+          <div className="p-4 border-b border-border bg-muted/20">
+            <Skeleton className="h-5 w-48 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="p-0">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex gap-4 p-4 border-b border-border/50 last:border-0">
+                <Skeleton className="h-6 w-[20%]" />
+                <Skeleton className="h-6 w-[15%]" />
+                <Skeleton className="h-6 w-[15%]" />
+                <Skeleton className="h-6 w-[10%]" />
+                <Skeleton className="h-6 w-[10%]" />
+                <Skeleton className="h-6 w-[10%]" />
+                <Skeleton className="h-6 w-[10%]" />
+                <Skeleton className="h-6 w-[10%]" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : (
         <>
           <Card className="hidden md:block overflow-hidden">
             <div className="overflow-x-auto">
@@ -828,8 +909,12 @@ export function Dashboard2Section() {
                 <TableBody>
                   {data.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                        No se encontraron declaraciones
+                      <TableCell colSpan={10} className="h-[300px] text-center">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground animate-in fade-in zoom-in-95 duration-300">
+                          <SearchX className="h-12 w-12 mb-4 text-muted-foreground/30" />
+                          <p className="text-lg font-medium text-foreground">No se encontraron declaraciones</p>
+                          <p className="text-sm">Ajusta los filtros de búsqueda para ver más resultados.</p>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -843,8 +928,10 @@ export function Dashboard2Section() {
           {/* Cards mobile */}
           <div className="md:hidden space-y-3">
             {data.length === 0 ? (
-              <Card className="p-6 text-center text-muted-foreground">
-                No se encontraron declaraciones
+              <Card className="p-8 text-center flex flex-col items-center justify-center text-muted-foreground">
+                <SearchX className="h-10 w-10 mb-3 text-muted-foreground/30" />
+                <p className="font-medium text-foreground">No hay resultados</p>
+                <p className="text-sm">Ajusta los filtros de búsqueda.</p>
               </Card>
             ) : (
               data.map((d, i) => renderMobileCard(d, i))
