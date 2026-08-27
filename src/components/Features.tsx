@@ -1,52 +1,103 @@
-import { FileText, Users, Shield } from "lucide-react";
-import { Card } from "./ui/card";
+import { FileText, Users, Bell, ArrowUpRight } from "lucide-react";
 
 const features = [
   {
     icon: FileText,
+    tone: "brand",
     title: "Automatización SAT",
-    description: "Scraping automático de documentos fiscales con ejecuciones programadas diarias.",
+    description:
+      "Descarga programada de documentos fiscales todos los días, sin intervención manual.",
+    points: ["Ejecuciones diarias", "CFDI y constancias", "Historial completo"],
   },
   {
     icon: Users,
-    title: "Gestión Multicliente",
-    description: "Administra hasta 150 clientes con dashboards personalizados y KPIs en tiempo real.",
+    tone: "mint",
+    title: "Gestión multicliente",
+    description:
+      "Administra hasta 150 clientes con paneles individuales y KPIs en tiempo real.",
+    points: ["Perfiles por cliente", "Roles de equipo", "Reportes listos"],
   },
   {
-    icon: Shield,
-    title: "Notificaciones Automáticas",
-    description: "Alertas por WhatsApp y Email. Mantén a tus clientes informados automáticamente.",
+    icon: Bell,
+    tone: "ink",
+    title: "Notificaciones automáticas",
+    description:
+      "Avisos por WhatsApp y correo para que tus clientes siempre estén informados.",
+    points: ["WhatsApp y Email", "Recordatorios", "Plantillas propias"],
   },
+];
+
+const toneClasses: Record<string, string> = {
+  brand: "bg-brand-soft text-brand",
+  mint: "bg-mint-soft text-mint",
+  ink: "bg-surface-alt text-ink",
+};
+
+const stats = [
+  { value: "150", label: "clientes por cuenta" },
+  { value: "3x", label: "ejecuciones diarias" },
+  { value: "7 GB", label: "de almacenamiento" },
+  { value: "24/7", label: "monitoreo activo" },
 ];
 
 export const Features = () => {
   return (
-    <section id="features" className="py-20 px-4 bg-background">
+    <section id="features" className="bg-surface px-4 py-20 sm:py-24">
       <div className="container mx-auto max-w-6xl">
-        <div className="text-center mb-16">
-          <div className="inline-block mb-3">
-            <span className="text-sm font-semibold tracking-wider uppercase text-primary">Características</span>
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Todo lo que necesitas para automatizar
+        <div className="max-w-2xl">
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-brand">
+            Características
+          </span>
+          <h2 className="mt-3 font-display text-3xl font-extrabold leading-tight text-ink sm:text-4xl lg:text-5xl">
+            Todo el trabajo repetitivo, resuelto
           </h2>
+          <p className="mt-4 text-lg text-ink-muted">
+            Una sola plataforma para descargar, organizar y comunicar la información fiscal
+            de toda tu cartera de clientes.
+          </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {features.map((feature, index) => {
+
+        <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+          {features.map((feature) => {
             const Icon = feature.icon;
             return (
-              <Card
-                key={index}
-                className="p-8 text-center hover-lift border-border bg-card"
+              <article
+                key={feature.title}
+                className="group flex flex-col rounded-2xl border border-line bg-surface p-7 transition-all duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-[var(--shadow-flat)]"
               >
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-lg bg-primary/10 text-primary mb-6">
-                  <Icon className="h-8 w-8" />
+                <div
+                  className={`inline-flex h-12 w-12 items-center justify-center rounded-xl ${toneClasses[feature.tone]}`}
+                >
+                  <Icon className="h-6 w-6" />
                 </div>
-                <h3 className="text-xl font-bold mb-3">{feature.title}</h3>
-                <p className="text-muted-foreground">{feature.description}</p>
-              </Card>
+                <h3 className="mt-6 font-display text-xl font-bold text-ink">
+                  {feature.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+                  {feature.description}
+                </p>
+                <ul className="mt-5 space-y-2 border-t border-line pt-5">
+                  {feature.points.map((p) => (
+                    <li key={p} className="flex items-center gap-2 text-sm text-ink">
+                      <ArrowUpRight className="h-4 w-4 text-brand" />
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+              </article>
             );
           })}
+        </div>
+
+        <div className="mt-14 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line lg:grid-cols-4">
+          {stats.map((s) => (
+            <div key={s.label} className="bg-surface px-6 py-7 text-center">
+              <p className="font-display text-3xl font-extrabold text-ink sm:text-4xl">
+                {s.value}
+              </p>
+              <p className="mt-1 text-sm text-ink-muted">{s.label}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>
