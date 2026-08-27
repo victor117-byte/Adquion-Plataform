@@ -844,7 +844,7 @@ function ExecutionMonitor({
 }) {
   const [status, setStatus] = useState<ExecutionStatus | null>(null);
   const [phasesStatus, setPhasesStatus] = useState<Record<string, PhaseState>>({});
-  const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Construir estado de fases a partir del status
   useEffect(() => {
