@@ -324,6 +324,21 @@ All colors MUST be HSL.
   --sidebar-ring: 215 16% 55%;
 }
 
+/* Marca en modo oscuro */
+.dark {
+  --brand: 15 100% 62%;
+  --brand-hover: 15 92% 56%;
+  --brand-foreground: 0 0% 100%;
+  --brand-soft: 15 40% 18%;
+  --mint: 168 62% 48%;
+  --mint-soft: 168 30% 16%;
+  --ink: 210 40% 98%;
+  --ink-muted: 215 20% 70%;
+  --surface: 217 33% 17%;
+  --surface-alt: 222 47% 13%;
+  --line: 217 25% 26%;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -331,12 +346,16 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-bold tracking-tight;
+    font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.025em;
   }
 }
+
 
 @layer utilities {
   .text-gradient {
