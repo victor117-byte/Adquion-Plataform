@@ -98,29 +98,29 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/30 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-surface-alt p-4">
       <div className="w-full max-w-md">
         {/* Logo y título */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-3 mb-6 hover:opacity-80 transition-opacity group">
-            <div className="p-2 bg-gradient-to-br from-primary to-purple-600 rounded-xl group-hover:scale-110 transition-transform">
-              <BarChart3 className="h-6 w-6 text-white" />
+            <div className="p-2 bg-brand rounded-xl group-hover:scale-110 transition-transform">
+              <BarChart3 className="h-6 w-6 text-brand-foreground" />
             </div>
-            <span className="font-bold text-2xl bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+            <span className="font-display text-2xl font-extrabold text-ink">
               Adquion
             </span>
           </Link>
-          <h1 className="text-3xl font-bold mb-2">
+          <h1 className="font-display text-3xl font-extrabold text-ink mb-2">
             {mode === "signup" ? "Crear cuenta" : "Bienvenido de nuevo"}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-ink-muted">
             {mode === "signup"
-              ? "Comienza a gestionar tu información fiscal"
+              ? "Comienza a gestionar tu información fiscal — gratis"
               : "Ingresa a tu cuenta para continuar"}
           </p>
         </div>
 
-        <Card className="p-6">
+        <Card className="rounded-2xl border-line bg-surface p-6 shadow-[var(--shadow-flat)]">
           <Tabs defaultValue={mode} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="login">Iniciar Sesión</TabsTrigger>

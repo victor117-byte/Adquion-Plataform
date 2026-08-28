@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ShieldCheck, Zap, FileText } from "lucide-react";
+import { ArrowRight, Building2, Check, ShieldCheck, Zap, FileText, Sparkle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 
@@ -10,45 +10,38 @@ const scrollToSection = (sectionId: string) => {
 };
 
 const bullets = [
+  "100% gratis por ahora",
   "Sin tarjeta de crédito",
   "Configuración en minutos",
-  "Datos cifrados",
 ];
 
 export const Hero = () => {
   return (
-    <section className="relative overflow-hidden bg-surface pt-28 sm:pt-32 pb-16 sm:pb-24 px-4">
+    <section className="relative overflow-hidden bg-surface pt-28 sm:pt-32 pb-20 sm:pb-28 px-4">
       {/* Formas suaves de fondo */}
       <div aria-hidden className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand-soft blur-3xl opacity-70" />
       <div aria-hidden className="pointer-events-none absolute top-40 -left-32 h-72 w-72 rounded-full bg-mint-soft blur-3xl opacity-70" />
 
       <div className="container relative mx-auto max-w-6xl">
-        <div className="grid items-center gap-12 lg:grid-cols-2">
+        <div className="grid items-center gap-16 lg:grid-cols-2">
           {/* Columna de texto */}
           <div className="text-center lg:text-left">
-            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-alt px-3 py-1 text-xs font-semibold uppercase tracking-wider text-ink-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand" />
-              Plataforma fiscal para contadores
+            <span className="inline-flex items-center gap-2 rounded-full border border-mint/30 bg-mint-soft px-3 py-1 text-xs font-semibold uppercase tracking-wider text-mint">
+              <span className="h-1.5 w-1.5 rounded-full bg-mint" />
+              Gratis durante el lanzamiento
             </span>
 
-            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] text-ink sm:text-5xl lg:text-[3.75rem]">
-              Automatiza el trabajo fiscal
-              <br className="hidden sm:block" />{" "}
-              <span className="relative inline-block">
-                <span className="relative z-10">que hoy haces a mano</span>
-                <span
-                  aria-hidden
-                  className="absolute inset-x-0 bottom-1 z-0 h-3 rounded-sm bg-brand/25"
-                />
-              </span>
+            <h1 className="mt-6 font-display text-4xl font-extrabold leading-[1.08] text-ink sm:text-5xl lg:text-[3.5rem]">
+              Automatiza el trabajo fiscal que hoy haces{" "}
+              <span className="text-brand">a mano</span>
             </h1>
 
-            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-ink-muted lg:mx-0">
-              Adquion descarga tus documentos del SAT, organiza declaraciones y avisa a tus
-              clientes automáticamente. Todo desde un solo panel.
+            <p className="mx-auto mt-5 max-w-md text-lg leading-relaxed text-ink-muted lg:mx-0">
+              Adquion entra al SAT por ti, descarga tus documentos y organiza tus
+              declaraciones todos los días — sin que muevas un dedo.
             </p>
 
-            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
+            <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row lg:justify-start">
               <Link to="/auth?mode=signup" className="w-full sm:w-auto">
                 <Button
                   size="lg"
@@ -61,14 +54,14 @@ export const Hero = () => {
               <Button
                 variant="outline"
                 size="lg"
-                onClick={() => scrollToSection("pricing")}
+                onClick={() => scrollToSection("apoyo")}
                 className="w-full rounded-lg border-2 border-ink/15 px-7 text-base font-bold text-ink hover:bg-surface-alt sm:w-auto"
               >
-                Ver planes
+                Ver qué incluye
               </Button>
             </div>
 
-            <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 lg:justify-start">
+            <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 lg:justify-start">
               {bullets.map((b) => (
                 <li key={b} className="flex items-center gap-1.5 text-sm text-ink-muted">
                   <Check className="h-4 w-4 text-mint" />
@@ -76,10 +69,15 @@ export const Hero = () => {
                 </li>
               ))}
             </ul>
+
+            <div className="mx-auto mt-8 flex max-w-md items-center gap-2 rounded-lg border border-line bg-surface-alt px-4 py-2.5 text-sm text-ink-muted lg:mx-0">
+              <Building2 className="h-4 w-4 flex-shrink-0 text-ink-muted" />
+              Para empresas, negocios y personas que trabajan por su cuenta.
+            </div>
           </div>
 
           {/* Mockup de producto */}
-          <div className="relative">
+          <div className="relative pb-6 pr-4 sm:pb-8 sm:pr-6">
             <div className="rounded-2xl border border-line bg-surface p-2 shadow-[var(--shadow-flat)]">
               <div className="flex items-center gap-1.5 px-3 py-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-brand/60" />
@@ -99,7 +97,7 @@ export const Hero = () => {
 
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: "Clientes", value: "148", icon: FileText },
+                    { label: "RFCs activos", value: "148", icon: FileText },
                     { label: "Descargas", value: "3.2k", icon: Zap },
                     { label: "Alertas", value: "12", icon: ShieldCheck },
                   ].map((k) => (
@@ -131,6 +129,17 @@ export const Hero = () => {
                     </div>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Tarjeta flotante decorativa */}
+            <div className="absolute bottom-0 right-0 flex items-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3 shadow-[var(--shadow-flat)]">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                <Sparkle className="h-4 w-4" />
+              </span>
+              <div className="leading-tight">
+                <p className="text-xs font-bold text-ink">Sin intervención manual</p>
+                <p className="text-[11px] text-ink-muted">Automatizado todos los días</p>
               </div>
             </div>
           </div>

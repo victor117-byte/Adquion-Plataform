@@ -7,11 +7,37 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+// Rutas que requieren sesión iniciada. Un 401 fuera de estas rutas (landing,
+// auth, comentarios, 404, etc.) no debe forzar un redirect a /auth — son
+// páginas públicas que también hacen fetches "best effort" sin usuario.
+const PROTECTED_PATH_PREFIXES = ['/main', '/onboarding', '/dashboard'];
+
 const handleAuthError = () => {
-  if (typeof window !== 'undefined' && !['/auth', '/'].includes(window.location.pathname)) {
+  if (typeof window === 'undefined') return;
+  const isProtectedRoute = PROTECTED_PATH_PREFIXES.some((prefix) =>
+    window.location.pathname.startsWith(prefix)
+  );
+  if (isProtectedRoute) {
     window.dispatchEvent(new CustomEvent('auth:session-expired'));
   }
 };
+
+// ==================== MENSAJES DE ERROR ====================
+
+/**
+ * Convierte errores técnicos (fetch, red, CORS) en mensajes que un usuario
+ * puede entender. Los errores que ya vienen del backend (ej. "Credenciales
+ * inválidas") se muestran tal cual porque ya son legibles.
+ */
+export function getFriendlyErrorMessage(error: unknown): string {
+  if (error instanceof TypeError && /fetch|network|load failed/i.test(error.message)) {
+    return 'No pudimos conectar con el servidor. Revisa tu conexión a internet e intenta de nuevo.';
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return 'Ocurrió un error inesperado. Intenta de nuevo.';
+}
 
 // ==================== TIPOS DE ERROR ====================
 

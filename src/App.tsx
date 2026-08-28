@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Main from "./pages/Main";
 import Onboarding from "./pages/Onboarding";
 import BillingRedirect from "./pages/BillingRedirect";
+import Comentarios from "./pages/Comentarios";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/main" element={<Main />} />
+                  <Route path="/comentarios" element={<Comentarios />} />
                   {/* Redirección desde Stripe Checkout */}
                   <Route path="/dashboard/billing" element={<BillingRedirect />} />
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

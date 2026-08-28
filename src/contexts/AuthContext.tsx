@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
-import { fetchAPI, refreshToken } from '@/utils/api';
+import { fetchAPI, refreshToken, getFriendlyErrorMessage } from '@/utils/api';
 
 // ==================== TIPOS ====================
 
@@ -148,7 +148,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.error('Error en login:', error);
       toast({
         title: 'Error de autenticación',
-        description: error instanceof Error ? error.message : 'Credenciales inválidas',
+        description: getFriendlyErrorMessage(error),
         variant: 'destructive',
       });
       throw error;
@@ -192,7 +192,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       console.error('Error en registro:', error);
       toast({
         title: 'Error de registro',
-        description: error instanceof Error ? error.message : 'Error al crear la cuenta',
+        description: getFriendlyErrorMessage(error),
         variant: 'destructive',
       });
       throw error;

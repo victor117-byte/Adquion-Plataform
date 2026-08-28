@@ -1,21 +1,22 @@
 import { BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+const CONTACT_EMAIL = "contacto@converso.mx";
+
 const columns = [
   {
     title: "Producto",
     links: [
       { label: "Características", to: "/#features" },
-      { label: "Precios", to: "/#pricing" },
+      { label: "Gratis", to: "/#apoyo" },
       { label: "Dashboard", to: "/main" },
     ],
   },
   {
     title: "Compañía",
     links: [
-      { label: "Sobre nosotros", to: "#" },
-      { label: "Contacto", to: "#" },
-      { label: "Privacidad", to: "#" },
+      { label: "Comentarios", to: "/comentarios" },
+      { label: "Contacto", to: `mailto:${CONTACT_EMAIL}` },
     ],
   },
 ];
@@ -33,8 +34,9 @@ export const Footer = () => {
               <span className="font-display text-xl font-extrabold text-ink">Adquion</span>
             </div>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-ink-muted">
-              Automatización fiscal para despachos contables. Descarga SAT, notificaciones
-              y reportes en tiempo real.
+              Automatización fiscal para empresas, negocios y personas que trabajan por su
+              cuenta. Descarga SAT, notificaciones y reportes en tiempo real — gratis
+              durante el lanzamiento.
             </p>
           </div>
 
@@ -46,12 +48,21 @@ export const Footer = () => {
               <ul className="mt-4 space-y-2.5">
                 {col.links.map((l) => (
                   <li key={l.label}>
-                    <Link
-                      to={l.to}
-                      className="text-sm text-ink-muted transition-colors hover:text-brand"
-                    >
-                      {l.label}
-                    </Link>
+                    {l.to.startsWith("mailto:") ? (
+                      <a
+                        href={l.to}
+                        className="text-sm text-ink-muted transition-colors hover:text-brand"
+                      >
+                        {l.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={l.to}
+                        className="text-sm text-ink-muted transition-colors hover:text-brand"
+                      >
+                        {l.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>

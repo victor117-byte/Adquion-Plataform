@@ -17,10 +17,10 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 217 91% 60%;
+    --primary: 15 100% 58%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 217 91% 55%;
-    --primary-glow: 217 91% 70%;
+    --primary-hover: 15 90% 51%;
+    --primary-glow: 15 100% 70%;
 
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
@@ -28,7 +28,7 @@ All colors MUST be HSL.
     --muted: 220 13% 95%;
     --muted-foreground: 220 9% 46%;
 
-    --accent: 217 91% 60%;
+    --accent: 15 100% 58%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
@@ -45,7 +45,7 @@ All colors MUST be HSL.
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 217 91% 60%;
+    --ring: 15 100% 58%;
 
     --radius: 0.75rem;
 
@@ -63,14 +63,14 @@ All colors MUST be HSL.
     --line: 220 16% 88%;
 
     /* Custom design tokens */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(262 83% 58%) 100%);
-    --gradient-hero: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(262 83% 58%) 50%, hsl(330 75% 60%) 100%);
-    --shadow-sm: 0 1px 2px 0 hsl(217 91% 60% / 0.05);
-    --shadow-md: 0 4px 6px -1px hsl(217 91% 60% / 0.1);
-    --shadow-lg: 0 10px 15px -3px hsl(217 91% 60% / 0.1);
-    --shadow-glow: 0 0 60px hsl(217 91% 60% / 0.4);
+    --gradient-primary: linear-gradient(135deg, hsl(15 100% 58%) 0%, hsl(168 62% 41%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(15 100% 58%) 0%, hsl(15 90% 51%) 50%, hsl(168 62% 41%) 100%);
+    --shadow-sm: 0 1px 2px 0 hsl(15 100% 58% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(15 100% 58% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(15 100% 58% / 0.1);
+    --shadow-glow: 0 0 60px hsl(15 100% 58% / 0.4);
     --shadow-card: 0 4px 20px hsl(222 47% 11% / 0.05);
-    --shadow-elegant: 0 10px 40px -10px hsl(217 91% 60% / 0.4);
+    --shadow-elegant: 0 10px 40px -10px hsl(15 100% 58% / 0.4);
     --shadow-flat: 0 1px 2px hsl(222 30% 11% / 0.04), 0 8px 24px -12px hsl(222 30% 11% / 0.12);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
@@ -80,7 +80,7 @@ All colors MUST be HSL.
 
     --sidebar-foreground: 240 5.3% 26.1%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary: 15 100% 58%;
 
     --sidebar-primary-foreground: 0 0% 98%;
 
@@ -90,7 +90,7 @@ All colors MUST be HSL.
 
     --sidebar-border: 220 13% 91%;
 
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 15 100% 58%;
   }
 
   .dark {
@@ -103,10 +103,10 @@ All colors MUST be HSL.
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 217 91% 60%;
+    --primary: 15 100% 62%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 217 91% 55%;
-    --primary-glow: 217 91% 70%;
+    --primary-hover: 15 92% 56%;
+    --primary-glow: 15 100% 72%;
 
     --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
@@ -114,7 +114,7 @@ All colors MUST be HSL.
     --muted: 217 33% 17%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 217 91% 60%;
+    --accent: 15 100% 62%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 63% 31%;
@@ -131,15 +131,15 @@ All colors MUST be HSL.
 
     --border: 217 33% 17%;
     --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    --ring: 15 100% 62%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 15 100% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 15 100% 62%;
   }
 
 }
@@ -359,7 +359,7 @@ All colors MUST be HSL.
 
 @layer utilities {
   .text-gradient {
-    @apply bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary via-primary-hover to-mint bg-clip-text text-transparent;
     animation: gradient-shift 3s ease infinite;
     background-size: 200% 200%;
   }

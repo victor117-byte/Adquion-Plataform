@@ -12,17 +12,17 @@ const features = [
   {
     icon: Users,
     tone: "mint",
-    title: "Gestión multicliente",
+    title: "Multiempresa",
     description:
-      "Administra hasta 150 clientes con paneles individuales y KPIs en tiempo real.",
-    points: ["Perfiles por cliente", "Roles de equipo", "Reportes listos"],
+      "Administra hasta 150 contribuyentes con paneles individuales y KPIs en tiempo real — tu negocio, tus otras empresas, o los de tu equipo.",
+    points: ["Perfiles por RFC", "Roles de equipo", "Reportes listos"],
   },
   {
     icon: Bell,
     tone: "ink",
     title: "Notificaciones automáticas",
     description:
-      "Avisos por WhatsApp y correo para que tus clientes siempre estén informados.",
+      "Avisos por WhatsApp y correo para que nunca se te pase una fecha límite o un documento pendiente.",
     points: ["WhatsApp y Email", "Recordatorios", "Plantillas propias"],
   },
 ];
@@ -34,7 +34,7 @@ const toneClasses: Record<string, string> = {
 };
 
 const stats = [
-  { value: "150", label: "clientes por cuenta" },
+  { value: "150", label: "contribuyentes por cuenta" },
   { value: "3x", label: "ejecuciones diarias" },
   { value: "7 GB", label: "de almacenamiento" },
   { value: "24/7", label: "monitoreo activo" },
@@ -52,8 +52,8 @@ export const Features = () => {
             Todo el trabajo repetitivo, resuelto
           </h2>
           <p className="mt-4 text-lg text-ink-muted">
-            Una sola plataforma para descargar, organizar y comunicar la información fiscal
-            de toda tu cartera de clientes.
+            Una sola plataforma para descargar, organizar y comunicar tu información
+            fiscal — seas una empresa, un negocio o trabajes por tu cuenta.
           </p>
         </div>
 
