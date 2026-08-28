@@ -17,6 +17,8 @@ const columns = [
     links: [
       { label: "Comentarios", to: "/comentarios" },
       { label: "Contacto", to: `mailto:${CONTACT_EMAIL}` },
+      { label: "Términos de Servicio", to: "/terminos" },
+      { label: "Política de Privacidad", to: "/privacidad" },
     ],
   },
 ];

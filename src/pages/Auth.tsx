@@ -353,13 +353,13 @@ export default function Auth() {
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>
               Al continuar, aceptas nuestros{" "}
-              <a href="#" className="text-primary hover:underline">
+              <Link to="/terminos" className="text-brand hover:underline">
                 Términos de Servicio
-              </a>{" "}
+              </Link>{" "}
               y{" "}
-              <a href="#" className="text-primary hover:underline">
+              <Link to="/privacidad" className="text-brand hover:underline">
                 Política de Privacidad
-              </a>
+              </Link>
             </p>
           </div>
         </Card>
