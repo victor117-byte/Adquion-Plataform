@@ -1,85 +1,44 @@
-import { FileText, Users, Upload, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { FileText, Users, Clock, ClipboardList, TrendingUp, CheckCircle, AlertTriangle, SearchX } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PlanLimitsCard } from "./PlanLimitsCard";
 import { useSubscription } from "@/hooks/use-subscription";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDashboardOverview, type ActividadItem } from "@/hooks/use-dashboard-overview";
 
-const statsData = [
-  {
-    title: "Documentos Procesados",
-    value: "127",
-    change: "+12%",
-    changeType: "positive" as const,
-    icon: FileText,
-  },
-  {
-    title: "Contribuyentes Activos",
-    value: "45",
-    change: "+5 nuevos",
-    changeType: "positive" as const,
-    icon: Users,
-  },
-  {
-    title: "Documentos Pendientes",
-    value: "8",
-    change: "Por procesar",
-    changeType: "neutral" as const,
-    icon: Upload,
-  },
-  {
-    title: "Automatizaciones",
-    value: "12",
-    change: "Ejecutadas hoy",
-    changeType: "positive" as const,
-    icon: TrendingUp,
-  },
+const statCards = [
+  { key: "documentos_procesados" as const, title: "Documentos Procesados", icon: FileText },
+  { key: "contribuyentes_activos" as const, title: "Contribuyentes Activos", icon: Users },
+  { key: "declaraciones_pendientes" as const, title: "Declaraciones Pendientes", icon: ClipboardList },
+  { key: "automatizaciones_hoy" as const, title: "Automatizaciones Hoy", icon: TrendingUp },
 ];
 
-const recentActivity = [
-  {
-    id: 1,
-    title: "Documento procesado: Factura-2025-001.pdf",
-    time: "Hace 2 horas",
-    status: "Completado",
-    statusColor: "text-success",
-  },
-  {
-    id: 2,
-    title: "Nuevo contribuyente agregado: Empresa ABC S.A.",
-    time: "Hace 5 horas",
-    status: "Nuevo",
-    statusColor: "text-info",
-  },
-  {
-    id: 3,
-    title: "Automatización SAT ejecutada",
-    time: "Hace 8 horas",
-    status: "Exitoso",
-    statusColor: "text-success",
-  },
-  {
-    id: 4,
-    title: "Notificación enviada a 15 contribuyentes",
-    time: "Ayer",
-    status: "Enviado",
-    statusColor: "text-primary",
-  },
-];
+const actividadConfig: Record<ActividadItem["tipo"], { icon: typeof FileText; label: string }> = {
+  documento: { icon: FileText, label: "Documento subido" },
+  contribuyente: { icon: Users, label: "Contribuyente agregado" },
+  automatizacion: { icon: TrendingUp, label: "Automatización ejecutada" },
+};
+
+const conexionSatConfig = {
+  activa: { label: "Activa", className: "text-success" },
+  con_errores: { label: "Con errores", className: "text-destructive" },
+  sin_datos: { label: "Sin datos", className: "text-muted-foreground" },
+};
 
 export function DashboardSection() {
   const { subscription } = useSubscription();
+  const { user } = useAuth();
+  const organizacion = user?.organizacionActiva?.database;
+  const { stats, actividadReciente, sistema, loading, error } = useDashboardOverview(organizacion);
 
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
-            <Badge variant="outline" className="bg-amber-100/50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800">
-              Datos de Demostración
-            </Badge>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1 text-sm sm:text-base">
             Resumen general de tu cuenta
           </p>
@@ -90,10 +49,17 @@ export function DashboardSection() {
         </div>
       </div>
 
+      {error && !loading && (
+        <Card className="p-6 flex flex-col items-center justify-center text-center gap-2">
+          <AlertTriangle className="h-8 w-8 text-destructive" />
+          <p className="text-sm text-destructive font-medium">{error}</p>
+        </Card>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {statsData.map((stat) => (
-          <Card key={stat.title} className="p-3 sm:p-5">
+        {statCards.map((stat) => (
+          <Card key={stat.key} className="p-3 sm:p-5">
             <div className="flex items-center justify-between mb-2 sm:mb-3">
               <h3 className="text-xs sm:text-sm font-medium text-muted-foreground line-clamp-1">
                 {stat.title}
@@ -102,12 +68,13 @@ export function DashboardSection() {
                 <stat.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
               </div>
             </div>
-            <p className="text-xl sm:text-2xl font-bold text-foreground">{stat.value}</p>
-            <p className={`text-xs sm:text-sm mt-1 ${
-              stat.changeType === 'positive' ? 'text-success' : 'text-muted-foreground'
-            }`}>
-              {stat.change}
-            </p>
+            {loading ? (
+              <Skeleton className="h-7 w-14" />
+            ) : (
+              <p className="text-xl sm:text-2xl font-bold text-foreground">
+                {stats ? stats[stat.key] : "—"}
+              </p>
+            )}
           </Card>
         ))}
       </div>
@@ -120,22 +87,47 @@ export function DashboardSection() {
             <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             <h2 className="text-base sm:text-lg font-semibold text-foreground">Actividad Reciente</h2>
           </div>
-          <div className="space-y-3 sm:space-y-4">
-            {recentActivity.map((activity) => (
-              <div 
-                key={activity.id} 
-                className="flex flex-col sm:flex-row sm:items-center justify-between py-2 sm:py-3 border-b border-border last:border-0 gap-1 sm:gap-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-foreground text-sm sm:text-base truncate">{activity.title}</p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">{activity.time}</p>
-                </div>
-                <span className={`text-xs sm:text-sm font-medium ${activity.statusColor} shrink-0`}>
-                  {activity.status}
-                </span>
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : actividadReciente.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+              <SearchX className="h-8 w-8 mb-2 text-muted-foreground/30" />
+              <p className="text-sm">Aún no hay actividad registrada.</p>
+            </div>
+          ) : (
+            <div className="space-y-3 sm:space-y-4">
+              {actividadReciente.map((item, i) => {
+                const config = actividadConfig[item.tipo];
+                return (
+                  <div
+                    key={i}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between py-2 sm:py-3 border-b border-border last:border-0 gap-1 sm:gap-2"
+                  >
+                    <div className="min-w-0 flex-1 flex items-center gap-2">
+                      <config.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground text-sm sm:text-base truncate">
+                          {config.label}: {item.titulo}
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          {formatDistanceToNow(new Date(item.fecha), { addSuffix: true, locale: es })}
+                        </p>
+                      </div>
+                    </div>
+                    {item.detalle && (
+                      <span className="text-xs sm:text-sm font-medium text-muted-foreground shrink-0">
+                        {item.detalle}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
 
         {/* Quick Stats */}
@@ -147,20 +139,30 @@ export function DashboardSection() {
           <div className="space-y-3 sm:space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-xs sm:text-sm text-muted-foreground">Conexión SAT</span>
-              <span className="text-xs sm:text-sm font-medium text-success">Activa</span>
+              {loading ? (
+                <Skeleton className="h-4 w-16" />
+              ) : (
+                <span className={`text-xs sm:text-sm font-medium ${conexionSatConfig[sistema?.conexion_sat ?? "sin_datos"].className}`}>
+                  {conexionSatConfig[sistema?.conexion_sat ?? "sin_datos"].label}
+                </span>
+              )}
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs sm:text-sm text-muted-foreground">Última sincronización</span>
-              <span className="text-xs sm:text-sm font-medium text-foreground">Hace 1 hora</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs sm:text-sm text-muted-foreground">Notificaciones</span>
-              <span className="text-xs sm:text-sm font-medium text-success">Habilitadas</span>
+              {loading ? (
+                <Skeleton className="h-4 w-20" />
+              ) : (
+                <span className="text-xs sm:text-sm font-medium text-foreground">
+                  {sistema?.ultima_sincronizacion
+                    ? formatDistanceToNow(new Date(sistema.ultima_sincronizacion), { addSuffix: true, locale: es })
+                    : "Sin datos"}
+                </span>
+              )}
             </div>
             <div className="flex justify-between items-center">
               <span className="text-xs sm:text-sm text-muted-foreground">Plan actual</span>
               <span className="text-xs sm:text-sm font-medium text-primary">
-                {subscription?.plan_name || 'Cargando...'}
+                {subscription?.plan_name || "Cargando..."}
               </span>
             </div>
           </div>
