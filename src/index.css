@@ -153,11 +153,11 @@ All colors MUST be HSL.
 :root.theme-emerald.light,
 :root.theme-emerald:not(.dark) {
   --primary: 160 84% 39%;
-  --primary-foreground: 0 0% 100%;
+  --primary-foreground: 222 47% 11%;
   --primary-hover: 160 84% 34%;
   --primary-glow: 160 84% 50%;
   --accent: 168 76% 42%;
-  --accent-foreground: 0 0% 100%;
+  --accent-foreground: 222 47% 11%;
   --ring: 160 84% 39%;
   --gradient-primary: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(168 76% 42%) 100%);
   --gradient-hero: linear-gradient(135deg, hsl(160 84% 39%) 0%, hsl(168 76% 42%) 50%, hsl(142 71% 45%) 100%);
@@ -170,11 +170,11 @@ All colors MUST be HSL.
 /* TEMA ESMERALDA (Emerald) - Dark */
 :root.theme-emerald.dark {
   --primary: 160 84% 45%;
-  --primary-foreground: 0 0% 100%;
+  --primary-foreground: 222 47% 11%;
   --primary-hover: 160 84% 40%;
   --primary-glow: 160 84% 55%;
   --accent: 168 76% 48%;
-  --accent-foreground: 0 0% 100%;
+  --accent-foreground: 222 47% 11%;
   --ring: 160 84% 45%;
   --gradient-primary: linear-gradient(135deg, hsl(160 84% 45%) 0%, hsl(168 76% 48%) 100%);
   --gradient-hero: linear-gradient(135deg, hsl(160 84% 45%) 0%, hsl(168 76% 48%) 50%, hsl(142 71% 50%) 100%);
@@ -223,11 +223,11 @@ All colors MUST be HSL.
 :root.theme-amber.light,
 :root.theme-amber:not(.dark) {
   --primary: 38 92% 50%;
-  --primary-foreground: 0 0% 100%;
+  --primary-foreground: 222 47% 11%;
   --primary-hover: 38 92% 45%;
   --primary-glow: 38 92% 60%;
   --accent: 25 95% 53%;
-  --accent-foreground: 0 0% 100%;
+  --accent-foreground: 222 47% 11%;
   --ring: 38 92% 50%;
   --gradient-primary: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(25 95% 53%) 100%);
   --gradient-hero: linear-gradient(135deg, hsl(38 92% 50%) 0%, hsl(25 95% 53%) 50%, hsl(0 84% 60%) 100%);
@@ -240,11 +240,11 @@ All colors MUST be HSL.
 /* TEMA ÁMBAR (Amber) - Dark */
 :root.theme-amber.dark {
   --primary: 38 92% 55%;
-  --primary-foreground: 0 0% 100%;
+  --primary-foreground: 222 47% 11%;
   --primary-hover: 38 92% 50%;
   --primary-glow: 38 92% 65%;
   --accent: 25 95% 58%;
-  --accent-foreground: 0 0% 100%;
+  --accent-foreground: 222 47% 11%;
   --ring: 38 92% 55%;
   --gradient-primary: linear-gradient(135deg, hsl(38 92% 55%) 0%, hsl(25 95% 58%) 100%);
   --gradient-hero: linear-gradient(135deg, hsl(38 92% 55%) 0%, hsl(25 95% 58%) 50%, hsl(0 84% 65%) 100%);
@@ -278,11 +278,11 @@ All colors MUST be HSL.
   --primary-foreground: 0 0% 100%;
   --primary-hover: 262 83% 58%;
   --primary-glow: 262 83% 73%;
-  --accent: 280 87% 70%;
+  --accent: 280 87% 60%;
   --accent-foreground: 0 0% 100%;
   --ring: 262 83% 63%;
-  --gradient-primary: linear-gradient(135deg, hsl(262 83% 63%) 0%, hsl(280 87% 70%) 100%);
-  --gradient-hero: linear-gradient(135deg, hsl(262 83% 63%) 0%, hsl(280 87% 70%) 50%, hsl(300 76% 65%) 100%);
+  --gradient-primary: linear-gradient(135deg, hsl(262 83% 63%) 0%, hsl(280 87% 60%) 100%);
+  --gradient-hero: linear-gradient(135deg, hsl(262 83% 63%) 0%, hsl(280 87% 60%) 50%, hsl(300 76% 65%) 100%);
   --shadow-glow: 0 0 60px hsl(262 83% 63% / 0.4);
   --shadow-elegant: 0 10px 40px -10px hsl(262 83% 63% / 0.4);
   --sidebar-primary: 262 83% 63%;

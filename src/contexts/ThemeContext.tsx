@@ -19,9 +19,9 @@ interface ThemeConfig {
 export const AVAILABLE_THEMES: ThemeConfig[] = [
   {
     id: 'default',
-    name: 'Azul Corporativo',
-    description: 'El tema por defecto con tonos azules profesionales',
-    preview: { primary: '#3b82f6', secondary: '#8b5cf6' }
+    name: 'Naranja Adquion',
+    description: 'El tema por defecto, con el naranja y menta de la marca',
+    preview: { primary: '#FF642D', secondary: '#28A98F' }
   },
   {
     id: 'emerald',
