@@ -570,7 +570,7 @@ export function DocumentsSection() {
     formData.append('contribuyente_id', selectedContribuyenteForUpload);
     formData.append('tipo_documento', 'pdf');
 
-    let progressInterval: NodeJS.Timeout | null = null;
+    let progressInterval: ReturnType<typeof setInterval> | null = null;
 
     try {
       progressInterval = setInterval(() => {

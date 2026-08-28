@@ -1,69 +1,69 @@
 import { BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+const columns = [
+  {
+    title: "Producto",
+    links: [
+      { label: "Características", to: "/#features" },
+      { label: "Precios", to: "/#pricing" },
+      { label: "Dashboard", to: "/main" },
+    ],
+  },
+  {
+    title: "Compañía",
+    links: [
+      { label: "Sobre nosotros", to: "#" },
+      { label: "Contacto", to: "#" },
+      { label: "Privacidad", to: "#" },
+    ],
+  },
+];
+
 export const Footer = () => {
   return (
-    <footer className="bg-muted/30 border-t border-border py-12 px-4">
+    <footer className="border-t border-line bg-surface px-4 py-14">
       <div className="container mx-auto max-w-6xl">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <BarChart3 className="h-6 w-6 text-primary" />
-              <span className="font-bold text-xl">Adquion</span>
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
+          <div className="md:col-span-2">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand">
+                <BarChart3 className="h-4.5 w-4.5 text-brand-foreground" />
+              </span>
+              <span className="font-display text-xl font-extrabold text-ink">Adquion</span>
             </div>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Automatización fiscal inteligente. Scraping SAT, notificaciones 
-              y reportes en tiempo real para contadores profesionales.
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-ink-muted">
+              Automatización fiscal para despachos contables. Descarga SAT, notificaciones
+              y reportes en tiempo real.
             </p>
           </div>
-          
-          <div>
-            <h4 className="font-semibold mb-4">Producto</h4>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/#features" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Características
-                </Link>
-              </li>
-              <li>
-                <Link to="/#pricing" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Precios
-                </Link>
-              </li>
-              <li>
-                <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Dashboard
-                </Link>
-              </li>
-            </ul>
-          </div>
-          
-          <div>
-            <h4 className="font-semibold mb-4">Compañía</h4>
-            <ul className="space-y-2">
-              <li>
-                <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Sobre Nosotros
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Contacto
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors">
-                  Privacidad
-                </a>
-              </li>
-            </ul>
-          </div>
+
+          {columns.map((col) => (
+            <div key={col.title}>
+              <h4 className="font-display text-sm font-bold uppercase tracking-wide text-ink">
+                {col.title}
+              </h4>
+              <ul className="mt-4 space-y-2.5">
+                {col.links.map((l) => (
+                  <li key={l.label}>
+                    <Link
+                      to={l.to}
+                      className="text-sm text-ink-muted transition-colors hover:text-brand"
+                    >
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-        
-        <div className="border-t border-border mt-8 pt-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            © 2025 Adquion. Todos los derechos reservados.
+
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-line pt-6 sm:flex-row">
+          <p className="text-sm text-ink-muted">
+            © {new Date().getFullYear()} Adquion. Todos los derechos reservados.
           </p>
+          <p className="text-sm text-ink-muted">Hecho en México</p>
         </div>
       </div>
     </footer>

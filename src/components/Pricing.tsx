@@ -1,8 +1,6 @@
 import { Check, Rocket } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
-import { Card } from "./ui/card";
-import { Badge } from "./ui/badge";
 
 const plans = [
   {
@@ -18,7 +16,7 @@ const plans = [
       "Acceso seguro",
       "Archivos de aclaración del contador",
     ],
-    cta: "Comenzar Gratis",
+    cta: "Comenzar gratis",
     highlighted: false,
   },
   {
@@ -38,7 +36,7 @@ const plans = [
       "30 clientes",
       "Integraciones (SAT)",
     ],
-    cta: "Comenzar Gratis",
+    cta: "Comenzar gratis",
     highlighted: true,
   },
   {
@@ -57,107 +55,100 @@ const plans = [
       "Notificaciones (WhatsApp / Email)",
       "150 clientes",
       "Integraciones (SAT)",
-      "Agente IA personalizado",
+      "Agente personalizado",
     ],
-    cta: "Comenzar Gratis",
+    cta: "Comenzar gratis",
     highlighted: false,
   },
 ];
 
 export const Pricing = () => {
   return (
-    <section id="pricing" className="py-20 px-4 bg-muted/30">
+    <section id="pricing" className="bg-surface-alt px-4 py-20 sm:py-24">
       <div className="container mx-auto max-w-6xl">
-        <div className="text-center mb-12">
-          <div className="inline-block mb-3">
-            <span className="text-sm font-semibold tracking-wider uppercase text-primary">Planes</span>
-          </div>
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+        <div className="mx-auto max-w-2xl text-center">
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-brand">
+            Planes
+          </span>
+          <h2 className="mt-3 font-display text-3xl font-extrabold leading-tight text-ink sm:text-4xl lg:text-5xl">
             Precios simples y transparentes
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Desde automatización básica hasta agentes IA personalizados.
-            Elige el plan que mejor se adapte a tu negocio.
+          <p className="mt-4 text-lg text-ink-muted">
+            Elige el plan que mejor se adapte a tu despacho. Puedes cambiarlo cuando quieras.
           </p>
         </div>
 
         {/* Banner de lanzamiento */}
-        <div className="flex items-center justify-center gap-3 mb-10 p-4 rounded-2xl bg-primary/10 border border-primary/20 max-w-2xl mx-auto">
-          <Rocket className="h-5 w-5 text-primary shrink-0" />
-          <p className="text-sm font-medium text-primary">
-            <span className="font-bold">Lanzamiento gratuito</span> — Todos los planes son gratuitos durante el periodo de lanzamiento. Los precios reales se activarán próximamente.
+        <div className="mx-auto mt-8 flex max-w-2xl items-center gap-3 rounded-xl border border-brand/30 bg-brand-soft px-4 py-3">
+          <Rocket className="h-5 w-5 shrink-0 text-brand" />
+          <p className="text-sm text-ink">
+            <span className="font-bold">Lanzamiento gratuito</span> — todos los planes son
+            gratuitos durante el periodo de lanzamiento.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {plans.map((plan, index) => (
-            <Card
-              key={index}
-              className={`p-8 relative hover-lift ${
+        <div className="mt-12 grid grid-cols-1 items-start gap-6 md:grid-cols-3">
+          {plans.map((plan) => (
+            <div
+              key={plan.name}
+              className={`relative flex h-full flex-col rounded-2xl bg-surface p-7 transition-all duration-300 ${
                 plan.highlighted
-                  ? "border-2 border-primary shadow-lg"
-                  : "border-border"
+                  ? "border-2 border-brand shadow-[var(--shadow-flat)] md:-mt-4 md:pb-9"
+                  : "border border-line hover:border-ink/25"
               }`}
             >
               {plan.highlighted && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold">
-                  Más Popular
-                </div>
+                <span className="absolute -top-3 left-7 rounded-md bg-brand px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-brand-foreground">
+                  Más popular
+                </span>
               )}
 
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {plan.description}
-                </p>
+              <h3 className="font-display text-xl font-bold text-ink">{plan.name}</h3>
+              <p className="mt-1 text-sm text-ink-muted">{plan.description}</p>
 
-                <div className="flex flex-col items-center gap-1">
-                  {/* Precio real tachado */}
-                  {plan.priceReal && (
-                    <div className="flex items-baseline gap-1 text-muted-foreground">
-                      <span className="text-xl line-through">{plan.priceReal}</span>
-                      <span className="text-sm line-through">{plan.period}</span>
-                    </div>
-                  )}
-                  {/* Precio de lanzamiento */}
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-4xl font-bold text-primary">{plan.price}</span>
-                    {plan.price !== "Gratis" && (
-                      <span className="text-muted-foreground">{plan.period}</span>
-                    )}
-                  </div>
-                  {plan.priceReal && (
-                    <Badge variant="outline" className="text-primary border-primary/40 text-xs mt-1">
-                      Durante el lanzamiento
-                    </Badge>
-                  )}
-                </div>
+              <div className="mt-6 flex items-end gap-2">
+                <span className="font-display text-4xl font-extrabold text-ink">
+                  {plan.price}
+                </span>
+                {plan.price !== "Gratis" && (
+                  <span className="pb-1 text-sm text-ink-muted">{plan.period}</span>
+                )}
+                {plan.priceReal && (
+                  <span className="pb-1.5 text-sm text-ink-muted line-through">
+                    {plan.priceReal}
+                    {plan.period}
+                  </span>
+                )}
               </div>
 
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, featureIndex) => (
-                  <li key={featureIndex} className="flex items-start gap-2">
-                    <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                    <span className="text-sm">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link to="/auth?mode=signup">
+              <Link to="/auth?mode=signup" className="mt-6 block">
                 <Button
-                  variant={plan.highlighted ? "hero" : "outline"}
-                  className="w-full"
                   size="lg"
+                  className={`w-full rounded-lg text-base font-bold shadow-none ${
+                    plan.highlighted
+                      ? "bg-brand text-brand-foreground hover:bg-brand-hover"
+                      : "border-2 border-ink/15 bg-transparent text-ink hover:bg-surface-alt"
+                  }`}
                 >
                   {plan.cta}
                 </Button>
               </Link>
-            </Card>
+
+              <ul className="mt-7 space-y-3 border-t border-line pt-6">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2.5">
+                    <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-mint" />
+                    <span className="text-sm text-ink">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
         </div>
 
-        <p className="text-center text-sm text-muted-foreground mt-8">
-          Puedes registrarte sin tarjeta de crédito. Los precios reales se comunicarán con anticipación.
+        <p className="mt-8 text-center text-sm text-ink-muted">
+          Puedes registrarte sin tarjeta de crédito. Los precios reales se comunicarán con
+          anticipación.
         </p>
       </div>
     </section>
