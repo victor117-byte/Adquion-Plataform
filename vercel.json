@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.adquion.com/api/:path*"
+      "destination": "https://backend.adquion.com/api/:path*"
     },
     {
       "source": "/((?!api/).*)",

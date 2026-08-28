@@ -4,13 +4,13 @@ import path from "path";
 
 const PROXY_TARGET = {
   test: 'http://localhost:3000',
-  development: 'https://api.adquion.com',
-  production: 'https://api.adquion.com',
+  development: 'https://backend.adquion.com',
+  production: 'https://backend.adquion.com',
 };
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const target = PROXY_TARGET[mode as keyof typeof PROXY_TARGET] ?? 'https://api.adquion.com';
+  const target = PROXY_TARGET[mode as keyof typeof PROXY_TARGET] ?? 'https://backend.adquion.com';
   const isLocal = mode === 'test';
 
   return {
