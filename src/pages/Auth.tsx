@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Auth() {
@@ -48,6 +49,7 @@ export default function Auth() {
   const [telefono, setTelefono] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [touched, setTouched] = useState<{ [k: string]: boolean }>({});
 
   const [loading, setLoading] = useState(false);
@@ -70,7 +72,7 @@ export default function Auth() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setTouched({ organizacion: true, nombre: true, correo: true, telefono: true, fechaNacimiento: true, contraseña: true });
-    if (!isPasswordStrong(contraseña) || !isValidBirthDate(fechaNacimiento)) return;
+    if (!isPasswordStrong(contraseña) || !isValidBirthDate(fechaNacimiento) || !aceptaTerminos) return;
     setLoading(true);
     try {
       await register({
@@ -336,12 +338,31 @@ export default function Auth() {
                   </ul>
                 </div>
 
+                <div className="flex items-start gap-2.5">
+                  <Checkbox
+                    id="acepta-terminos"
+                    checked={aceptaTerminos}
+                    onCheckedChange={(checked) => setAceptaTerminos(checked === true)}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="acepta-terminos" className="text-sm font-normal leading-snug text-muted-foreground">
+                    Acepto los{" "}
+                    <Link to="/terminos" target="_blank" className="text-brand hover:underline">
+                      Términos de Servicio
+                    </Link>{" "}
+                    y la{" "}
+                    <Link to="/privacidad" target="_blank" className="text-brand hover:underline">
+                      Política de Privacidad
+                    </Link>
+                  </Label>
+                </div>
+
                 <Button
                   type="submit"
                   variant="hero"
                   className="w-full"
                   size="lg"
-                  disabled={loading || !isPasswordStrong(contraseña) || !isValidBirthDate(fechaNacimiento)}
+                  disabled={loading || !isPasswordStrong(contraseña) || !isValidBirthDate(fechaNacimiento) || !aceptaTerminos}
                 >
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Crear Cuenta
@@ -352,7 +373,7 @@ export default function Auth() {
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>
-              Al continuar, aceptas nuestros{" "}
+              Consulta nuestros{" "}
               <Link to="/terminos" className="text-brand hover:underline">
                 Términos de Servicio
               </Link>{" "}
