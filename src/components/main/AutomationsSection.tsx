@@ -45,7 +45,7 @@ interface ScriptFase {
   id: string;
   nombre: string;
   descripcion?: string;
-  peso: number;
+  peso?: number;
 }
 
 interface ScriptVariable {
@@ -70,7 +70,6 @@ interface ScriptDisponible {
   script_path: string;
   nombre_sugerido: string;
   nombre_display: string;
-  descripcion_sugerida?: string;
   configurado: boolean;
   es_especifico_org?: boolean;
   tiene_metadata?: boolean;
@@ -111,7 +110,6 @@ interface PhaseState {
 
 interface ExecutionStatus {
   execution_id: string;
-  organizacion: string;
   started_at: string;
   updated_at: string;
   status: 'running' | 'completed' | 'error';
@@ -142,10 +140,7 @@ interface LogEjecucion {
   fecha_fin: string | null;
   duracion_segundos: number | null;
   output: string | null;
-  error_mensaje: string | null;
-  ejecutado_por?: string;
-  ejecutado_por_correo?: string;
-  es_programado?: boolean;
+  mensaje: string | null;
 }
 
 // ==================== CONSTANTES ====================
@@ -1210,7 +1205,7 @@ export function AutomationsSection() {
 
     setFormConfig({
       cron_expresion: '0 9 * * *',
-      descripcion: script.metadata?.descripcion || script.descripcion_sugerida || '',
+      descripcion: script.metadata?.descripcion || '',
       variables_personalizadas: varsIniciales,
     });
     setDialogConfigOpen(true);
@@ -1518,9 +1513,9 @@ export function AutomationsSection() {
                 </div>
 
                 <div className="p-4 space-y-3">
-                  {(script.metadata?.descripcion || script.descripcion_sugerida) && (
+                  {script.metadata?.descripcion && (
                     <p className="text-sm text-muted-foreground line-clamp-2">
-                      {script.metadata?.descripcion || script.descripcion_sugerida}
+                      {script.metadata.descripcion}
                     </p>
                   )}
 
@@ -1741,7 +1736,9 @@ export function AutomationsSection() {
                               <p className="font-medium text-sm">{fase.nombre}</p>
                               {fase.descripcion && <p className="text-xs text-muted-foreground">{fase.descripcion}</p>}
                             </div>
-                            <Badge variant="outline" className="text-[10px]">{fase.peso}%</Badge>
+                            {fase.peso != null && (
+                              <Badge variant="outline" className="text-[10px]">{fase.peso}%</Badge>
+                            )}
                           </div>
                           {i < scriptSeleccionado.metadata!.fases!.length - 1 && (
                             <ArrowDown className="h-4 w-4 text-muted-foreground my-1" />
@@ -1930,23 +1927,15 @@ export function AutomationsSection() {
                             <Clock className="h-3 w-3" />{log.duracion_segundos}s
                           </Badge>
                         )}
-                        {log.es_programado === false && (
-                          <Badge variant="secondary" className="text-xs">Manual</Badge>
-                        )}
                       </div>
-                      {log.ejecutado_por && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Por: {log.ejecutado_por}
-                        </p>
-                      )}
                     </div>
                   </div>
 
-                  {log.error_mensaje && (
-                    <ErrorPanel error={log.error_mensaje} />
+                  {log.estado === 'error' && log.mensaje && (
+                    <ErrorPanel error={log.mensaje} />
                   )}
 
-                  {log.output && !log.error_mensaje && (
+                  {log.output && !(log.estado === 'error' && log.mensaje) && (
                     <ScrollArea className="h-20 w-full rounded border bg-muted/30 p-2">
                       <p className="text-xs font-mono text-muted-foreground whitespace-pre-wrap">{log.output}</p>
                     </ScrollArea>

@@ -8,6 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Este repositorio **solo contiene el frontend**. No incluye el backend, la base de datos ni el servicio de WhatsApp — esos viven en repos/servicios separados descritos abajo. Cualquier lógica de negocio, autenticación real o persistencia se hace en el backend remoto.
 
+Si necesitas documentacion d ecomo consumi rle backend de adquion aqui esta
+
+https://backend.adquion.com/api/automatizaciones/docs
+
+Consultalo cada vez que lo encesitemos para integrar cosa, no des a conocer esta ruta publicamente, solo es para ti, para que sepas como consumir sus recursos
+
 ## Infraestructura y a dónde se conecta
 
 ```
