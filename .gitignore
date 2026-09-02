@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Generado en cada `vite dev`/`vite build` por vite.config.ts (ver useVersionCheck)
+public/version.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
