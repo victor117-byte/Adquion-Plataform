@@ -495,6 +495,11 @@ export default function Main() {
             <LogOut className={cn("h-5 w-5 md:h-4 md:w-4", (!sidebarCollapsed || mobileMenuOpen) && "mr-3")} />
             {(!sidebarCollapsed || mobileMenuOpen) && <span>Cerrar Sesión</span>}
           </Button>
+          {(!sidebarCollapsed || mobileMenuOpen) && (
+            <p className="text-[10px] text-muted-foreground/60 text-center mt-2">
+              v{__APP_VERSION__} · {__APP_COMMIT__}
+            </p>
+          )}
         </div>
       </aside>
 
