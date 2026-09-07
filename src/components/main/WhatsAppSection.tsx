@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Bot, Plus, Trash2, MessageSquare, Sparkles, Loader2,
-  Phone, MoreHorizontal, Pencil, Wifi, WifiOff, Copy,
-  Check, ArrowLeft, Link2, RefreshCw, ZapOff, Zap,
+  Phone, MoreHorizontal, Pencil, Wifi, WifiOff,
+  ArrowLeft, Link2, RefreshCw, ZapOff, Zap, QrCode,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -28,18 +28,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 // TIPOS
 // ──────────────────────────────────────────────────────────────────────────────
 
+type ConnectionStatus = "conectado" | "desconectado" | "pendiente_qr";
+
 interface Canal {
   id: number;
-  channel_id: string;
   phone_number: string;
   display_name: string;
-  phone_number_id: string;
-  waba_id: string;
   wa_org_id: string;
   agente_id: number | null;
-  subscription_id: string;
-  webhook_url: string;
   activo: boolean;
+  connection_status: ConnectionStatus;
   created_at: string;
   updated_at: string;
 }
@@ -92,20 +90,6 @@ const inputMonoCls = inputCls + " font-mono";
 // HELPERS
 // ──────────────────────────────────────────────────────────────────────────────
 
-function CopyBtn({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={async () => { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      className="ml-2 shrink-0 rounded p-1 text-muted-foreground hover:text-foreground transition"
-    >
-      {copied
-        ? <Check className="h-3.5 w-3.5 text-emerald-500" />
-        : <Copy className="h-3.5 w-3.5" />}
-    </button>
-  );
-}
-
 function ActiveBadge({ active }: { active: boolean }) {
   return (
     <span className={cn(
@@ -114,6 +98,25 @@ function ActiveBadge({ active }: { active: boolean }) {
     )}>
       <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-emerald-500" : "bg-muted-foreground/50")} />
       {active ? "Activo" : "Inactivo"}
+    </span>
+  );
+}
+
+const CONNECTION_META: Record<ConnectionStatus, { label: string; className: string; dot: string }> = {
+  conectado: { label: "Conectado", className: "bg-emerald-500/10 text-emerald-600", dot: "bg-emerald-500" },
+  pendiente_qr: { label: "Falta escanear QR", className: "bg-amber-500/10 text-amber-700", dot: "bg-amber-500" },
+  desconectado: { label: "Desconectado", className: "bg-destructive/10 text-destructive", dot: "bg-destructive" },
+};
+
+function ConnectionBadge({ status }: { status: ConnectionStatus }) {
+  const meta = CONNECTION_META[status] ?? CONNECTION_META.desconectado;
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+      meta.className
+    )}>
+      <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
+      {meta.label}
     </span>
   );
 }
@@ -139,19 +142,23 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
   const [showCreate, setShowCreate] = useState(false);
   const [editTarget, setEditTarget] = useState<Canal | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Canal | null>(null);
-  const [webhookInfo, setWebhookInfo] = useState<{ url: string; verifyToken: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [toggling, setToggling] = useState<number | null>(null);
   const [formErr, setFormErr] = useState("");
 
-  const [form, setForm] = useState({
-    phoneNumber: "", displayName: "", accessToken: "",
-    phoneNumberId: "", wabaId: "", verifyToken: "", agenteId: "",
-  });
+  const [form, setForm] = useState({ displayName: "", agenteId: "" });
   const [editForm, setEditForm] = useState({ display_name: "", agente_id: "", activo: true });
 
+  // ─── Emparejamiento por QR (Evolution API) ───────────────────────────────
+  const [qrCanal, setQrCanal] = useState<Canal | null>(null);
+  const [qrData, setQrData] = useState<{ base64: string | null; pairingCode: string | null } | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState("");
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => { loadAll(); }, []);
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const loadAll = async () => {
     setLoading(true);
@@ -165,28 +172,68 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
     } finally { setLoading(false); }
   };
 
+  const stopPolling = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+  };
+
+  const closeQrDialog = () => {
+    stopPolling();
+    setQrCanal(null);
+    setQrData(null);
+    setQrError("");
+  };
+
+  const fetchQr = async (canalId: number) => {
+    setQrLoading(true);
+    setQrError("");
+    try {
+      const res = await fetchAPI<{ base64: string | null; pairingCode: string | null }>(
+        `/whatsapp/canales/${canalId}/qr`
+      );
+      setQrData(res);
+    } catch (e: unknown) {
+      setQrError(e instanceof Error ? e.message : "Error obteniendo el código QR");
+    } finally { setQrLoading(false); }
+  };
+
+  const openQrDialog = (canal: Canal) => {
+    setQrCanal(canal);
+    setQrData(null);
+    setQrError("");
+    fetchQr(canal.id);
+
+    stopPolling();
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetchAPI<{ connection_status: ConnectionStatus }>(`/whatsapp/canales/${canal.id}/estado`);
+        setCanales(p => p.map(c => c.id === canal.id ? { ...c, connection_status: res.connection_status } : c));
+        if (res.connection_status === "conectado") {
+          stopPolling();
+          toast({ title: "WhatsApp conectado" });
+          closeQrDialog();
+        }
+      } catch { /* red intermitente — se reintenta en el próximo tick */ }
+    }, 3000);
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.phoneNumber || !form.displayName || !form.accessToken || !form.phoneNumberId || !form.wabaId) {
-      setFormErr("Completa todos los campos obligatorios."); return;
+    if (!form.displayName.trim()) {
+      setFormErr("El nombre a mostrar es obligatorio."); return;
     }
     setFormErr(""); setSaving(true);
     try {
-      const res = await fetchAPI<{ canal: Canal; metaWebhook: { url: string; verifyToken: string } }>(
+      const res = await fetchAPI<{ canal: Canal }>(
         "/whatsapp/canales",
         { method: "POST", body: JSON.stringify({
-          phoneNumber: form.phoneNumber, displayName: form.displayName,
-          accessToken: form.accessToken, phoneNumberId: form.phoneNumberId,
-          wabaId: form.wabaId,
-          ...(form.verifyToken ? { verifyToken: form.verifyToken } : {}),
+          displayName: form.displayName,
           ...(form.agenteId ? { agenteId: Number(form.agenteId) } : {}),
         }) }
       );
       setCanales(p => [...p, res.canal]);
-      setWebhookInfo(res.metaWebhook);
       setShowCreate(false);
-      setForm({ phoneNumber: "", displayName: "", accessToken: "", phoneNumberId: "", wabaId: "", verifyToken: "", agenteId: "" });
-      toast({ title: "Canal registrado" });
+      setForm({ displayName: "", agenteId: "" });
+      openQrDialog(res.canal);
     } catch (e: unknown) {
       setFormErr(e instanceof Error ? e.message : "Error registrando canal");
     } finally { setSaving(false); }
@@ -246,41 +293,6 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Webhook info post-creación */}
-      {webhookInfo && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-900/20 p-5 space-y-4">
-          <div className="flex items-center gap-2">
-            <Check className="h-4 w-4 text-emerald-600 shrink-0" />
-            <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-400">
-              Canal registrado — configura el Webhook en Meta
-            </p>
-          </div>
-          <p className="text-xs text-emerald-700 dark:text-emerald-300">
-            Ve a <strong>Meta Developer Console → WhatsApp → Webhooks</strong> y pega estos valores. Solo se muestran una vez.
-          </p>
-          <div className="space-y-2">
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Callback URL</p>
-              <div className="flex items-center rounded-lg border border-input bg-background px-3 py-2">
-                <code className="flex-1 min-w-0 truncate text-xs">{webhookInfo.url}</code>
-                <CopyBtn text={webhookInfo.url} />
-              </div>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Verify Token</p>
-              <div className="flex items-center rounded-lg border border-input bg-background px-3 py-2">
-                <code className="flex-1 min-w-0 truncate text-xs">{webhookInfo.verifyToken}</code>
-                <CopyBtn text={webhookInfo.verifyToken} />
-              </div>
-            </div>
-          </div>
-          <button onClick={() => setWebhookInfo(null)}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition">
-            Entendido, ya los copié
-          </button>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
@@ -293,7 +305,7 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
           {isAdmin && (
             <button onClick={() => { setFormErr(""); setShowCreate(true); }}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition">
-              <Plus className="h-4 w-4" /> Registrar Canal
+              <Plus className="h-4 w-4" /> Conectar WhatsApp
             </button>
           )}
         </div>
@@ -305,7 +317,7 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
           <Phone className="h-8 w-8 text-muted-foreground/30" />
           <p className="text-sm font-medium text-foreground">Sin canales registrados</p>
           <p className="text-xs text-muted-foreground max-w-xs">
-            Registra tu primer número de WhatsApp Business para empezar a recibir mensajes.
+            Conecta tu número de WhatsApp escaneando un código QR para empezar a recibir mensajes — gratis, sin cuenta de Meta.
           </p>
         </div>
       ) : (
@@ -326,6 +338,7 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold text-foreground">{canal.display_name}</p>
                         <ActiveBadge active={canal.activo} />
+                        <ConnectionBadge status={canal.connection_status} />
                       </div>
                       <p className="mt-0.5 text-xs font-mono text-muted-foreground">{canal.phone_number}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -336,40 +349,38 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
                     </div>
                   </div>
 
-                  {isAdmin && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button disabled={toggling === canal.id} className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50">
-                          {toggling === canal.id
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <MoreHorizontal className="h-4 w-4" />}
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={() => openEdit(canal)} className="cursor-pointer">
-                          <Pencil className="mr-2 h-4 w-4" /> Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggle(canal)} className="cursor-pointer">
-                          {canal.activo ? <><WifiOff className="mr-2 h-4 w-4" /> Desactivar</> : <><Wifi className="mr-2 h-4 w-4" /> Activar</>}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setDeleteTarget(canal)} className="cursor-pointer text-destructive focus:text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-
-                {canal.webhook_url && (
-                  <div className="mt-3 pt-3 border-t border-border/60">
-                    <p className="text-[10px] text-muted-foreground mb-1">Webhook URL</p>
-                    <div className="flex items-center rounded-md border border-border bg-muted/40 px-2.5 py-1.5">
-                      <code className="flex-1 min-w-0 truncate text-[10px] text-muted-foreground">{canal.webhook_url}</code>
-                      <CopyBtn text={canal.webhook_url} />
-                    </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {canal.connection_status !== "conectado" && (
+                      <button onClick={() => openQrDialog(canal)}
+                        className="flex items-center gap-1.5 rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition">
+                        <QrCode className="h-3.5 w-3.5" /> Ver QR
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button disabled={toggling === canal.id} className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition disabled:opacity-50">
+                            {toggling === canal.id
+                              ? <Loader2 className="h-4 w-4 animate-spin" />
+                              : <MoreHorizontal className="h-4 w-4" />}
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => openEdit(canal)} className="cursor-pointer">
+                            <Pencil className="mr-2 h-4 w-4" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleToggle(canal)} className="cursor-pointer">
+                            {canal.activo ? <><WifiOff className="mr-2 h-4 w-4" /> Desactivar</> : <><Wifi className="mr-2 h-4 w-4" /> Activar</>}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setDeleteTarget(canal)} className="cursor-pointer text-destructive focus:text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
@@ -378,48 +389,20 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
 
       {/* Dialog registrar canal */}
       <Dialog open={showCreate} onOpenChange={(o) => { if (!saving) setShowCreate(o); }}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Registrar canal de WhatsApp</DialogTitle>
+            <DialogTitle>Conectar WhatsApp</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4 pt-1">
+            <p className="text-xs text-muted-foreground">
+              Se crea un número gratis vía WhatsApp Web — en el siguiente paso escaneas un código QR
+              con el celular que va a operar el bot (Dispositivos vinculados → Vincular dispositivo).
+            </p>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="mb-1.5 block text-xs font-medium text-foreground">Número de teléfono *</label>
-                  <input value={form.phoneNumber} onChange={e => setForm(p => ({ ...p, phoneNumber: e.target.value }))} placeholder="+521234567890" disabled={saving} className={inputCls} />
-                </div>
-                <div className="col-span-2 sm:col-span-1">
-                  <label className="mb-1.5 block text-xs font-medium text-foreground">Nombre a mostrar *</label>
-                  <input value={form.displayName} onChange={e => setForm(p => ({ ...p, displayName: e.target.value }))} placeholder="Adquion Fiscal" disabled={saving} className={inputCls} />
-                </div>
-              </div>
-
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Credenciales Meta</p>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground">Phone Number ID *</label>
-                      <input value={form.phoneNumberId} onChange={e => setForm(p => ({ ...p, phoneNumberId: e.target.value }))} placeholder="1024654650730049" disabled={saving} className={inputMonoCls} />
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-foreground">WABA ID *</label>
-                      <input value={form.wabaId} onChange={e => setForm(p => ({ ...p, wabaId: e.target.value }))} placeholder="987654321098765" disabled={saving} className={inputMonoCls} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-foreground">Access Token *</label>
-                    <input type="password" value={form.accessToken} onChange={e => setForm(p => ({ ...p, accessToken: e.target.value }))} placeholder="EAAam3UqdWAABQ..." disabled={saving} className={inputMonoCls} />
-                    <p className="mt-1 text-xs text-muted-foreground">Usa un token de sistema permanente para producción.</p>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-foreground">Verify Token <span className="font-normal text-muted-foreground">(opcional, se autogenera)</span></label>
-                    <input value={form.verifyToken} onChange={e => setForm(p => ({ ...p, verifyToken: e.target.value }))} placeholder="mi_token_secreto" disabled={saving} className={inputMonoCls} />
-                  </div>
-                </div>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">Nombre a mostrar *</label>
+                <input value={form.displayName} onChange={e => setForm(p => ({ ...p, displayName: e.target.value }))} placeholder="Adquion Fiscal" disabled={saving} className={inputCls} />
               </div>
-
               <div>
                 <label className="mb-1.5 block text-xs font-medium text-foreground">Agente IA <span className="font-normal text-muted-foreground">(opcional)</span></label>
                 <select value={form.agenteId} onChange={e => setForm(p => ({ ...p, agenteId: e.target.value }))} disabled={saving} className={inputCls}>
@@ -436,10 +419,58 @@ function CanalesTab({ isAdmin }: { isAdmin: boolean }) {
               </button>
               <button type="submit" disabled={saving}
                 className="flex-1 rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-60">
-                {saving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Registrando...</span> : "Registrar canal"}
+                {saving ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Creando...</span> : "Crear y mostrar QR"}
               </button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog QR de emparejamiento */}
+      <Dialog open={!!qrCanal} onOpenChange={(o) => { if (!o) closeQrDialog(); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Escanea el código QR</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1 text-center">
+            <p className="text-xs text-muted-foreground">
+              Abre WhatsApp en el celular de <strong>{qrCanal?.display_name}</strong> → Dispositivos vinculados →
+              Vincular dispositivo, y escanea este código.
+            </p>
+            <div className="flex items-center justify-center rounded-xl border border-border bg-muted/30 p-4 min-h-[220px]">
+              {qrLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : qrError ? (
+                <p className="text-sm text-destructive">{qrError}</p>
+              ) : qrData?.base64 ? (
+                <img
+                  src={qrData.base64.startsWith("data:") ? qrData.base64 : `data:image/png;base64,${qrData.base64}`}
+                  alt="Código QR de WhatsApp"
+                  className="h-52 w-52"
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin código QR disponible — puede que ya esté conectado.</p>
+              )}
+            </div>
+            {qrData?.pairingCode && (
+              <p className="text-xs text-muted-foreground">
+                O usa el código de emparejamiento: <code className="font-mono font-semibold">{qrData.pairingCode}</code>
+              </p>
+            )}
+            <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" /> Esperando a que escanees...
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => qrCanal && fetchQr(qrCanal.id)} disabled={qrLoading}
+                className="flex-1 rounded-lg border border-input py-2 text-xs font-medium hover:bg-muted transition disabled:opacity-50">
+                <span className="inline-flex items-center gap-1.5"><RefreshCw className="h-3.5 w-3.5" /> Actualizar QR</span>
+              </button>
+              <button type="button" onClick={closeQrDialog}
+                className="flex-1 rounded-lg border border-input py-2 text-xs font-medium hover:bg-muted transition">
+                Cerrar
+              </button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -559,7 +590,7 @@ function AgentesTab({ isAdmin }: { isAdmin: boolean }) {
   const syncFields = (a: Agente) => setFields({
     nombre: a.nombre, activo: a.activo, system_prompt: a.system_prompt ?? "",
     contexto: a.contexto ?? "", modelo: a.modelo ?? "llama-3.3-70b-versatile",
-    temperatura: a.temperatura ?? 0.3, max_historial: a.max_historial ?? 10,
+    temperatura: Number(a.temperatura ?? 0.3), max_historial: a.max_historial ?? 10,
   });
 
   const selectAgente = (a: Agente) => { setSelectedId(a.id); syncFields(a); };
