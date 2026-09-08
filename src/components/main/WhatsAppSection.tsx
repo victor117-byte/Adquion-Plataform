@@ -419,9 +419,12 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
 
   useEffect(() => { loadCanales(); }, []);
   useEffect(() => {
-    if (canales.length > 0 && !selectedId && !isMobile) selectCanal(canales[0]);
+    // La organización solo puede tener un canal a la vez (el backend responde
+    // 409 al intentar crear un segundo) — no hay nada que "elegir", así que se
+    // selecciona directo también en móvil para no exigir un tap de más.
+    if (canales.length > 0 && !selectedId) selectCanal(canales[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canales, isMobile]);
+  }, [canales]);
 
   const loadCanales = async () => {
     setLoading(true);
@@ -472,8 +475,8 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
     if (!disconnectTarget) return;
     setDisconnecting(true);
     try {
-      await fetchAPI(`/whatsapp/canales/${disconnectTarget.id}/conexion`, { method: "DELETE" });
-      setCanales(p => p.map(c => c.id === disconnectTarget.id ? { ...c, estado_conexion: "desconectado", phone_number: null } : c));
+      const res = await fetchAPI<{ canal: Canal }>(`/whatsapp/canales/${disconnectTarget.id}/conexion`, { method: "DELETE" });
+      setCanales(p => p.map(c => c.id === disconnectTarget.id ? res.canal : c));
       setDisconnectTarget(null);
       toast({ title: "Número desconectado" });
     } catch { toast({ title: "Error al desconectar", variant: "destructive" }); }
@@ -493,8 +496,11 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
       {showList && (
         <div className={cn("shrink-0 space-y-3", isMobile ? "w-full" : "w-[300px]")}>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground">Mis números</h2>
-            {isAdmin && (
+            <h2 className="text-sm font-semibold text-foreground">Mi número de WhatsApp</h2>
+            {/* La organización solo puede tener un canal activo — el backend
+                responde 409 si ya existe uno, así que el botón de conectar
+                solo se ofrece cuando todavía no hay ninguno. */}
+            {isAdmin && canales.length === 0 && (
               <button onClick={() => setWizardOpen(true)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90 transition">
                 <Plus className="h-3.5 w-3.5" /> Conectar
