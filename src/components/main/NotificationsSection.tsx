@@ -14,6 +14,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { WhatsAppSection } from "@/components/main/WhatsAppSection";
+import { EmailSection } from "@/components/main/EmailSection";
 
 interface Notification {
   id: string;
@@ -175,12 +176,12 @@ export function NotificationsSection() {
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Notificaciones</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-          Alertas del sistema y configuración del chatbot de WhatsApp
+          Alertas del sistema, tu chatbot de WhatsApp y el correo para enviar recordatorios
         </p>
       </div>
 
       <Tabs defaultValue="alertas">
-        <TabsList className="grid w-full grid-cols-2 max-w-sm">
+        <TabsList className="grid w-full grid-cols-3 max-w-lg">
           <TabsTrigger value="alertas" className="flex items-center gap-1.5">
             <Bell className="h-3.5 w-3.5" />
             Alertas
@@ -193,6 +194,10 @@ export function NotificationsSection() {
           <TabsTrigger value="whatsapp" className="flex items-center gap-1.5">
             <MessageSquare className="h-3.5 w-3.5" />
             WhatsApp
+          </TabsTrigger>
+          <TabsTrigger value="correo" className="flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5" />
+            Correo
           </TabsTrigger>
         </TabsList>
 
@@ -313,6 +318,10 @@ export function NotificationsSection() {
 
         <TabsContent value="whatsapp" className="mt-4">
           <WhatsAppSection />
+        </TabsContent>
+
+        <TabsContent value="correo" className="mt-4">
+          <EmailSection />
         </TabsContent>
       </Tabs>
     </div>
