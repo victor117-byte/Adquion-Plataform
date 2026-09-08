@@ -43,10 +43,11 @@ export function DashboardSection() {
             Resumen general de tu cuenta
           </p>
         </div>
-        {/* Plan Limits Card - Only shows for free users or when near limits */}
-        <div className="w-full lg:max-w-sm lg:ml-auto">
+        {/* Plan Limits Card — oculto: capa gratuita hasta nuevo aviso, todos con todo desbloqueado.
+            Reactivar quitando este comentario. */}
+        {/* <div className="w-full lg:max-w-sm lg:ml-auto">
           <PlanLimitsCard />
-        </div>
+        </div> */}
       </div>
 
       {error && !loading && (

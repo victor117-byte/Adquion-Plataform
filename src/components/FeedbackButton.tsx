@@ -161,10 +161,11 @@ export function FeedbackButton() {
       {/* Botón flotante */}
       <Button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 z-50 bg-gradient-to-r from-primary to-primary/80"
+        className="fixed bottom-4 right-4 h-11 w-11 sm:bottom-6 sm:right-6 sm:h-14 sm:w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 z-50 bg-gradient-to-r from-primary to-primary/80"
+        style={{ marginBottom: "env(safe-area-inset-bottom)" }}
         size="icon"
       >
-        <MessageSquarePlus className="h-6 w-6" />
+        <MessageSquarePlus className="h-4 w-4 sm:h-6 sm:w-6" />
       </Button>
 
       {/* Modal de feedback */}

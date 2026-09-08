@@ -67,7 +67,7 @@ const menuPermissions: Record<string, SectionType[]> = {
     'notifications',
     'powerbi',
     'settings',
-    'subscription',
+    // 'subscription', // Capa gratuita hasta nuevo aviso — reactivar quitando este comentario
   ],
   contador: [
     'dashboard',
