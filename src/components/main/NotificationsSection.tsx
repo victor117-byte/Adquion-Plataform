@@ -176,7 +176,7 @@ export function NotificationsSection() {
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Notificaciones</h1>
         <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-          Alertas del sistema, tu chatbot de WhatsApp y el correo para enviar recordatorios
+          Alertas del sistema y los recordatorios que mandas por WhatsApp y correo
         </p>
       </div>
 

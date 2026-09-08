@@ -4,7 +4,7 @@ import {
   Phone, MoreHorizontal, Wifi, WifiOff, Copy,
   Check, ArrowLeft, RefreshCw, ZapOff, Zap,
   QrCode, Smartphone, Link2,
-  Info, AlertTriangle,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -38,11 +38,6 @@ interface Canal {
   phone_number: string | null;
   estado_conexion: EstadoConexion;
   activo: boolean;
-  system_prompt: string;
-  contexto: string;
-  modelo: string;
-  temperatura: number;
-  max_historial: number;
   created_at: string;
   updated_at: string;
 }
@@ -79,8 +74,6 @@ interface Mensaje {
 
 const inputCls =
   "w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition disabled:opacity-50";
-
-const inputMonoCls = inputCls + " font-mono";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // HELPERS
@@ -137,7 +130,7 @@ function Spinner() {
 // Pasos genéricos para vincular un dispositivo — iguales a los que el usuario ya
 // conoce de WhatsApp Web, sin mencionar la tecnología detrás del QR.
 const PASOS_VINCULACION = [
-  "Abre WhatsApp en el celular que va a atender los mensajes del chatbot.",
+  "Abre WhatsApp en el celular que va a mandar los recordatorios.",
   "Toca los tres puntos (Android) o Ajustes (iPhone), en la esquina superior.",
   'Selecciona "Dispositivos vinculados" y luego "Vincular un dispositivo".',
   "Apunta la cámara de tu celular a este código para escanearlo.",
@@ -373,12 +366,12 @@ function ConnectWizard({
             <div>
               <p className="text-base font-semibold text-foreground">¡WhatsApp conectado!</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Ya puedes configurar cómo responde tu chatbot a tus clientes.
+                Ya puedes mandar recordatorios a tus contribuyentes.
               </p>
             </div>
             <button onClick={handleFinish}
               className="w-full rounded-lg bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90 transition">
-              Configurar mi chatbot
+              Listo
             </button>
           </div>
         )}
@@ -388,17 +381,12 @@ function ConnectWizard({
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// TAB: NÚMEROS (conexión + configuración del chatbot, todo en un solo lugar)
+// TAB: NÚMEROS (conexión + datos básicos del canal)
 // ──────────────────────────────────────────────────────────────────────────────
 
-interface ChatbotFields {
+interface CanalFields {
   display_name: string;
   activo: boolean;
-  system_prompt: string;
-  contexto: string;
-  modelo: string;
-  temperatura: number;
-  max_historial: number;
 }
 
 function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
@@ -406,7 +394,7 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
   const [canales, setCanales] = useState<Canal[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [fields, setFields] = useState<ChatbotFields | null>(null);
+  const [fields, setFields] = useState<CanalFields | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Canal | null>(null);
@@ -437,9 +425,6 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
 
   const syncFields = (c: Canal) => setFields({
     display_name: c.display_name, activo: c.activo,
-    system_prompt: c.system_prompt ?? "", contexto: c.contexto ?? "",
-    modelo: c.modelo || "llama-3.3-70b-versatile",
-    temperatura: Number(c.temperatura ?? 0.3), max_historial: c.max_historial ?? 10,
   });
 
   const selectCanal = (c: Canal) => { setSelectedId(c.id); syncFields(c); };
@@ -453,7 +438,7 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
       });
       setCanales(p => p.map(c => c.id === selected.id ? res.canal : c));
       syncFields(res.canal);
-      toast({ title: "Chatbot guardado" });
+      toast({ title: "Cambios guardados" });
     } catch { toast({ title: "Error guardando", variant: "destructive" }); }
     finally { setSaving(false); }
   };
@@ -483,7 +468,7 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
     finally { setDisconnecting(false); }
   };
 
-  const set = <K extends keyof ChatbotFields>(k: K, v: ChatbotFields[K]) => setFields(p => p ? { ...p, [k]: v } : p);
+  const set = <K extends keyof CanalFields>(k: K, v: CanalFields[K]) => setFields(p => p ? { ...p, [k]: v } : p);
 
   if (loading) return <Spinner />;
 
@@ -607,13 +592,13 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
             </div>
           )}
 
-          {/* Banner borrador (conectado pero desactivado) */}
+          {/* Banner pausado (conectado pero desactivado) */}
           {isAdmin && selected.estado_conexion === "conectado" && !fields.activo && (
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-900/20">
               <div className="flex items-center gap-2.5">
                 <ZapOff className="h-4 w-4 shrink-0 text-amber-600" />
                 <p className="text-sm text-amber-800 dark:text-amber-400">
-                  El chatbot está <strong>apagado</strong> — el número recibe mensajes pero nadie responde.
+                  Este número está <strong>pausado</strong> — no mandará recordatorios programados hasta que lo actives.
                 </p>
               </div>
               <button onClick={() => set("activo", true)}
@@ -636,7 +621,7 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
                       : "border-input bg-background text-muted-foreground hover:bg-primary/5 hover:text-primary hover:border-primary/30"
                   )}>
                   {fields.activo ? <Zap className="h-3.5 w-3.5 fill-emerald-500 text-emerald-500" /> : <ZapOff className="h-3.5 w-3.5" />}
-                  {fields.activo ? "Chatbot activo" : "Chatbot apagado"}
+                  {fields.activo ? "Número activo" : "Número pausado"}
                 </button>
               )}
             </div>
@@ -644,73 +629,6 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
               <label className="mb-1.5 block text-sm font-medium text-foreground">Nombre para identificarlo</label>
               <p className="mb-2 text-xs text-muted-foreground">Solo lo ves tú dentro de la plataforma, tus clientes no lo ven.</p>
               <input value={fields.display_name} onChange={e => set("display_name", e.target.value)} disabled={!isAdmin} className={inputCls} />
-            </div>
-          </div>
-
-          {/* Instrucciones */}
-          <div className="rounded-xl border border-border bg-card p-4 md:p-6 space-y-3">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Instrucciones del chatbot</h3>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Le dice al chatbot <strong>cómo comportarse</strong>: qué tono usar, qué puede responder y qué no.
-              Piénsalo como las indicaciones que le darías a un empleado nuevo antes de contestar WhatsApp por ti.
-            </p>
-            <textarea value={fields.system_prompt} onChange={e => set("system_prompt", e.target.value)}
-              rows={5} disabled={!isAdmin}
-              placeholder="Eres un asistente fiscal experto en México. Responde solo dudas fiscales, con un tono amable y profesional. Si no sabes algo, dilo claramente en vez de inventar una respuesta..."
-              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition resize-none disabled:opacity-50" />
-          </div>
-
-          {/* Contexto (RAG) */}
-          <div className="rounded-xl border border-border bg-card p-4 md:p-6 space-y-3">
-            <div className="flex items-center gap-2">
-              <Info className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold text-foreground">Información de tu despacho</h3>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Datos propios que el chatbot usa para responder mejor: tarifas, horarios de atención, políticas,
-              regímenes fiscales que manejas, etc. Se le recuerda esto en cada conversación, como si fuera su
-              "hoja de referencia".
-            </p>
-            <textarea value={fields.contexto} onChange={e => set("contexto", e.target.value)}
-              rows={6} disabled={!isAdmin}
-              placeholder="Este despacho atiende a personas físicas con actividad empresarial. Régimen fiscal: RIF / RESICO. Obligaciones: declaraciones mensuales de IVA e ISR. Horario de atención: L-V 9am-6pm..."
-              className="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 transition resize-none disabled:opacity-50" />
-          </div>
-
-          {/* Parámetros del modelo */}
-          <div className="rounded-xl border border-border bg-card p-4 md:p-6 space-y-5">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Ajustes avanzados</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Opcional — los valores por defecto funcionan bien para la mayoría de los casos.
-              </p>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Modelo</label>
-              <input value={fields.modelo} onChange={e => set("modelo", e.target.value)} disabled={!isAdmin} className={inputMonoCls} />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Creatividad de las respuestas</label>
-                <span className="text-sm font-mono text-muted-foreground">{fields.temperatura.toFixed(1)}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Más bajo = respuestas precisas y consistentes · Más alto = respuestas más variadas</p>
-              <input type="range" min={0} max={1} step={0.1} value={fields.temperatura}
-                onChange={e => set("temperatura", Number(e.target.value))} disabled={!isAdmin}
-                className="w-full accent-primary disabled:opacity-50" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Memoria de la conversación</label>
-                <span className="text-sm font-mono text-muted-foreground">{fields.max_historial} mensajes</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Cuántos mensajes anteriores recuerda el chatbot al responder (1–50)</p>
-              <input type="range" min={1} max={50} step={1} value={fields.max_historial}
-                onChange={e => set("max_historial", Number(e.target.value))} disabled={!isAdmin}
-                className="w-full accent-primary disabled:opacity-50" />
             </div>
           </div>
 
@@ -733,7 +651,7 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
           <div className="flex flex-1 items-center justify-center">
             <div className="text-center">
               <Bot className="mx-auto h-10 w-10 text-muted-foreground/30" />
-              <p className="mt-3 text-sm text-muted-foreground">Selecciona un número para configurar su chatbot</p>
+              <p className="mt-3 text-sm text-muted-foreground">Selecciona un número para ver sus datos</p>
             </div>
           </div>
         )
@@ -769,8 +687,8 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Desconectar este número?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{disconnectTarget?.display_name}</strong> dejará de recibir y responder mensajes hasta que
-              vuelvas a escanear el código QR. La configuración del chatbot se conserva.
+              <strong>{disconnectTarget?.display_name}</strong> dejará de recibir mensajes y de mandar recordatorios
+              hasta que vuelvas a escanear el código QR.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -789,7 +707,7 @@ function NumerosTab({ isAdmin }: { isAdmin: boolean }) {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar este número?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará <strong>{deleteTarget?.display_name}</strong> y toda la configuración de su chatbot.
+              Se eliminará <strong>{deleteTarget?.display_name}</strong> por completo.
               Las conversaciones ya registradas se conservan.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -819,7 +737,6 @@ function ConversacionesTab() {
   const [selected, setSelected] = useState<Conversacion | null>(null);
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
-  const [togglingBot, setTogglingBot] = useState(false);
   const [linkMode, setLinkMode] = useState(false);
   const [rfcInput, setRfcInput] = useState("");
   const [nombreInput, setNombreInput] = useState("");
@@ -859,16 +776,6 @@ function ConversacionesTab() {
     });
     setSelected(res.conversacion);
     setConvs(p => p.map(c => c.jid === res.conversacion.jid ? res.conversacion : c));
-  };
-
-  const handleToggleBot = async () => {
-    if (!selected) return;
-    setTogglingBot(true);
-    try {
-      await patchConv({ bot_activo: !selected.bot_activo });
-      toast({ title: selected.bot_activo ? "Bot pausado — control manual" : "Bot reactivado" });
-    } catch { toast({ title: "Error", variant: "destructive" }); }
-    finally { setTogglingBot(false); }
   };
 
   const handleLinkRFC = async () => {
@@ -915,13 +822,7 @@ function ConversacionesTab() {
               <button key={c.jid} onClick={() => selectConv(c)}
                 className={cn("w-full text-left px-3 py-3 border-b last:border-0 hover:bg-muted/50 transition-colors",
                   selected?.jid === c.jid && "bg-primary/5")}>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-foreground truncate">{displayName(c)}</p>
-                  <span className={cn("text-[10px] font-semibold uppercase shrink-0",
-                    c.bot_activo ? "text-emerald-600" : "text-amber-600")}>
-                    {c.bot_activo ? "Bot" : "Manual"}
-                  </span>
-                </div>
+                <p className="text-sm font-medium text-foreground truncate">{displayName(c)}</p>
                 {c.rfc && <p className="text-xs text-muted-foreground mt-0.5">{c.rfc}</p>}
                 <p className="text-[10px] text-muted-foreground mt-0.5">{timeAgo(c.ultimo_mensaje_at)}</p>
               </button>
@@ -950,17 +851,6 @@ function ConversacionesTab() {
                 className="flex items-center gap-1 rounded-lg border border-input px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition">
                 <Link2 className="h-3.5 w-3.5" />
                 {selected.rfc ? selected.rfc : "RFC"}
-              </button>
-              <button onClick={handleToggleBot} disabled={togglingBot}
-                className={cn(
-                  "flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition disabled:opacity-50",
-                  selected.bot_activo
-                    ? "border-input text-muted-foreground hover:bg-destructive/5 hover:text-destructive hover:border-destructive/30"
-                    : "border-emerald-200 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20"
-                )}>
-                {togglingBot ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : selected.bot_activo ? <><Bot className="h-3.5 w-3.5" />Tomar control</>
-                    : <><Zap className="h-3.5 w-3.5" />Devolver a bot</>}
               </button>
             </div>
           </div>
@@ -1015,17 +905,6 @@ function ConversacionesTab() {
               </div>
             )}
           </ScrollArea>
-
-          {/* Bot status bar */}
-          <div className={cn(
-            "flex items-center gap-1.5 px-3 py-2 text-xs border-t shrink-0",
-            selected.bot_activo ? "bg-emerald-50 dark:bg-emerald-900/10" : "bg-amber-50 dark:bg-amber-900/10"
-          )}>
-            <span className={cn("h-1.5 w-1.5 rounded-full", selected.bot_activo ? "bg-emerald-500" : "bg-amber-500")} />
-            <span className={selected.bot_activo ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}>
-              {selected.bot_activo ? "Bot activo — respondiendo automáticamente" : "Control manual — bot pausado"}
-            </span>
-          </div>
         </div>
       ) : (
         !isMobile && (
@@ -1059,7 +938,7 @@ export function WhatsAppSection() {
           WhatsApp
         </h2>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Conecta el WhatsApp de tu despacho escaneando un código QR y configura cómo responde tu chatbot.
+          Conecta el WhatsApp de tu despacho escaneando un código QR para mandar recordatorios a tus contribuyentes.
         </p>
       </div>
 
