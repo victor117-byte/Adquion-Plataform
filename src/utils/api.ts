@@ -115,6 +115,25 @@ export function getHeaders(includeContentType: boolean = true): Record<string, s
 // ==================== FETCH BASE ====================
 
 /**
+ * Lee el body de una Response de forma segura: si viene vacío (204, un
+ * error sin body, un timeout de un servicio upstream) o no es JSON válido,
+ * regresa un objeto con `error` en vez de dejar que `response.json()`
+ * truene con "Unexpected end of JSON input" — un mensaje ilegible para
+ * quien esté usando la app.
+ */
+async function parseResponseBody(response: Response) {
+  const text = await response.text();
+  if (!text) {
+    return { error: `El servidor no respondió (${response.status}${response.statusText ? ' ' + response.statusText : ''})` };
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: `Respuesta inesperada del servidor (${response.status})` };
+  }
+}
+
+/**
  * Realiza un fetch con cookies incluidas automáticamente
  * El backend usa cookies httpOnly para autenticación
  *
@@ -152,7 +171,7 @@ export async function fetchAPI<T = unknown>(
           handleAuthError();
           throw new Error('Sesión expirada');
         }
-        const retryData = await retryResponse.json();
+        const retryData = await parseResponseBody(retryResponse);
         if (!retryResponse.ok) {
           throw new Error(retryData.error || retryData.message || 'Error en la petición');
         }
@@ -176,7 +195,7 @@ export async function fetchAPI<T = unknown>(
             handleAuthError();
             throw new Error('Sesión expirada');
           }
-          const retryData = await retryResponse.json();
+          const retryData = await parseResponseBody(retryResponse);
           if (!retryResponse.ok) {
             throw new Error(retryData.error || retryData.message || 'Error en la petición');
           }
@@ -192,7 +211,7 @@ export async function fetchAPI<T = unknown>(
     }
   }
 
-  const data = await response.json();
+  const data = await parseResponseBody(response);
 
   // Manejar error 403 - puede ser límite excedido o sin acceso
   if (response.status === 403) {
@@ -326,7 +345,7 @@ export async function fetchWithRefresh<T = unknown>(
         handleAuthError();
         throw new Error('Sesión expirada');
       }
-      return retryResponse.json();
+      return parseResponseBody(retryResponse);
     } catch {
       handleAuthError();
       throw new Error('Sesión expirada');
@@ -338,7 +357,7 @@ export async function fetchWithRefresh<T = unknown>(
     throw new Error('Sesión expirada');
   }
 
-  const data = await response.json();
+  const data = await parseResponseBody(response);
 
   if (response.status === 403) {
     if (data.upgradeRequired) {
