@@ -98,7 +98,12 @@ function notifyLimitExceeded(error: LimitExceededError): void {
  * @param includeContentType - Si incluir Content-Type JSON (default: true)
  */
 export function getHeaders(includeContentType: boolean = true): Record<string, string> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    // El backend sigue detrás de un túnel ngrok; sin este header, ngrok le
+    // sirve al navegador su página de advertencia en vez de la respuesta
+    // real, y el fetch truena al intentar parsear ese HTML como JSON.
+    'ngrok-skip-browser-warning': 'true',
+  };
 
   if (includeContentType) {
     headers['Content-Type'] = 'application/json';
