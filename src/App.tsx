@@ -8,7 +8,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { UpgradePlanProvider } from "./contexts/UpgradePlanContext";
-import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Main from "./pages/Main";
 import Onboarding from "./pages/Onboarding";
@@ -47,7 +46,7 @@ const App = () => (
             <UpgradePlanProvider>
               <ThemeSync>
                 <Routes>
-                  <Route path="/" element={<Index />} />
+                  <Route path="/" element={<NotFound />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/main" element={<Main />} />
