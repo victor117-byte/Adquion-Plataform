@@ -46,7 +46,7 @@ const App = () => (
             <UpgradePlanProvider>
               <ThemeSync>
                 <Routes>
-                  <Route path="/" element={<NotFound />} />
+                  <Route path="/" element={null} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/main" element={<Main />} />
